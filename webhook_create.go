@@ -1,6 +1,7 @@
 package main
 
 import (
+	wapi "github.com/DisgoOrg/disgohook/api"
 	"net/http"
 	"net/url"
 	"os"
@@ -36,16 +37,7 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	compiledRoute, _ := tokenURL.Compile()
 	var rs *struct {
-		Webhook struct {
-			ID            string `json:"id"`
-			ApplicationID string `json:"application_id"`
-			Name          string `json:"name"`
-			Url           string `json:"url"`
-			ChannelID     string `json:"channel_id"`
-			Token         string `json:"token"`
-			Type          int    `json:"type"`
-			GuildID       string `json:"guild_id"`
-		} `json:"webhook"`
+		wapi.Webhook `json:"webhook"`
 	}
 
 	rq := url.Values{
@@ -62,7 +54,7 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	webhookClient, err := disgohook.NewWebhookByIDToken(httpClient, logger, rs.Webhook.ID, rs.Webhook.Token)
+	webhookClient, err := disgohook.NewWebhookByIDToken(httpClient, logger, rs.Webhook.ID, *rs.Webhook.Token)
 	if err != nil {
 		logger.Errorf("error creating webhook client: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -71,11 +63,23 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	addSubreddit(webhookState.Subreddit, webhookClient)
 
-	_, err = webhookState.Interaction.SendFollowup(api.NewFollowupMessageBuilder().
-		SetEphemeral(true).
-		SetContent("Successfully added webhook!").
+	_, err = webhookClient.SendMessage(wapi.NewWebhookMessageBuilder().
+		SetContent("Webhook successfully created").
 		Build(),
 	)
+	var message *api.FollowupMessageBuilder
+	if err != nil {
+		logger.Errorf("error while tesing webhook: %s", err)
+		message = api.NewFollowupMessageBuilder().
+			SetEphemeral(true).
+			SetContent("There was a problem setting up your webhook.\nRetry or reach out for help [here](https://discord.gg/sD3ABd5)")
+	} else {
+		message = api.NewFollowupMessageBuilder().
+			SetEphemeral(true).
+			SetContent("Successfully added webhook. Everything is ready to go")
+	}
+
+	_, err = webhookState.Interaction.SendFollowup(message.Build())
 	if err != nil {
 		logger.Errorf("error while sending followup: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)

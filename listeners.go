@@ -7,7 +7,7 @@ import (
 	"github.com/DisgoOrg/disgo/api/events"
 )
 
-const redirectURL = "https://636723724864.ngrok.io/webhooks/create/callback"
+const redirectURL = "https://553f0ccaa2d9.ngrok.io/webhooks/create/callback"
 
 var states = map[api.Snowflake]*WebhookCreate{}
 
@@ -90,7 +90,7 @@ func onSlashCommand(event *events.SlashCommandEvent) {
 }
 
 func initCommands() error {
-	_, err := dgo.RestClient().SetGuildCommands(dgo.ApplicationID(), "817327181659111454", commands...)
+	_, err := dgo.RestClient().SetGuildCommands(dgo.ApplicationID(), "608506410803658753", commands...)
 	return err
 }
 

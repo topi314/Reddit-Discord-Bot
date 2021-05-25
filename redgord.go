@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"syscall"
 
 	"github.com/DisgoOrg/disgo"
@@ -16,8 +17,10 @@ import (
 var logger = logrus.New()
 var httpClient *http.Client
 var dgo api.Disgo
-var subreddits = map[string][]wapi.Webhook{}
+var subreddits = map[string][]wapi.WebhookClient{}
 var redditClient *reddit.Client
+
+var imageRegex = regexp.MustCompile(`.*\.(?:jpg|gif|png)`)
 
 func main() {
 	httpClient = http.DefaultClient
@@ -32,7 +35,7 @@ func main() {
 		SetCacheFlags(api.CacheFlagsNone).
 		SetMemberCachePolicy(api.MemberCachePolicyNone).
 		SetMessageCachePolicy(api.MessageCachePolicyNone).
-		SetWebhookServerProperties("/webhooks/interactions/callback", 80, os.Getenv("public_key")).
+		SetWebhookServerProperties("/webhooks/interactions/callback", 12345, os.Getenv("public_key")).
 		AddEventListeners(getListenerAdapter()).
 		Build()
 	if err != nil {
@@ -45,11 +48,13 @@ func main() {
 
 	if err = initCommands(); err != nil {
 		logger.Panic("failed to init commands")
+		return
 	}
 
 	redditClient, err = reddit.NewReadonlyClient()
 	if err != nil {
 		logger.Panic("failed to init reddit client")
+		return
 	}
 
 	s := make(chan os.Signal, 1)
@@ -57,37 +62,46 @@ func main() {
 	<-s
 }
 
-func addSubreddit(subreddit string, webhookClient wapi.Webhook) {
+func addSubreddit(subreddit string, webhookClient wapi.WebhookClient) {
 	subreddits[subreddit] = append(subreddits[subreddit], webhookClient)
 
 	go func() {
+		postCount := 0
 		posts, errs, _ := redditClient.Stream.Posts(subreddit)
 		for {
 			select {
 			case post := <-posts:
+				postCount++
+				if postCount <= 100 {
+					continue
+				}
 				description := post.Body
 				if len(description) > 2048 {
 					description = string([]rune(description)[0:2045]) + "..."
 				}
 
-				message := wapi.NewWebhookMessageBuilder().
-					SetEmbeds(wapi.NewEmbedBuilder().
-						SetTitle(post.Title).
-						SetURL("https://www.reddit.com" + post.Permalink).
-						SetColor(0xff581a).
-						SetAuthorName("New post in "+ post.SubredditNamePrefixed).
-						SetAuthorURL("https://www.reddit.com" + post.SubredditNamePrefixed).
-						SetDescription(description).
-						AddField("Author", post.Author, false).
-						Build(),
-					).
+				url := post.URL
+				if !imageRegex.MatchString(url) {
+					url = ""
+				}
+
+				embed := wapi.NewEmbedBuilder().
+					SetTitle(post.Title).
+					SetURL("https://www.reddit.com"+post.Permalink).
+					SetColor(0xff581a).
+					SetAuthorName("New post on "+post.SubredditNamePrefixed).
+					SetAuthorURL("https://www.reddit.com/"+post.SubredditNamePrefixed).
+					SetDescription(description).
+					SetImage(url).
+					AddField("Author", post.Author, false).
 					Build()
 
 				for _, webhookClient := range subreddits[subreddit] {
-					_, err := webhookClient.SendMessage(message)
+					_, err := webhookClient.SendEmbed(embed)
 					if err != nil {
 						logger.Errorf("error while sending post to webhook: %s", err)
 					}
+
 				}
 			case err := <-errs:
 				logger.Errorf("received error from reddit post stream: %s", err)
