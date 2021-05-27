@@ -1,0 +1,6 @@
+.editorconfig
+README.md
+LICENSE
+Dockerfile
+conf.env
+conf.env.example

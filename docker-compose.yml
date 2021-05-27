@@ -1,0 +1,17 @@
+version: '3.7'
+
+services:
+    reddit-discord-bot:
+        image: docker.pkg.github.com/topisenpai/reddit-discord-bot:latest
+        container_name: reddit-discord-bot
+        restart: unless-stopped
+        env_file:
+            - conf.env
+        networks:
+            - reddit-discord-bot
+        ports:
+            - 80:80
+
+networks:
+    reddit-discord-bot:
+        name:  reddit-discord-bot

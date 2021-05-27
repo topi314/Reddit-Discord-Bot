@@ -1,14 +1,13 @@
 package main
 
 import (
-	wapi "github.com/DisgoOrg/disgohook/api"
 	"net/http"
 	"net/url"
-	"os"
 
 	"github.com/DisgoOrg/disgo/api"
 	"github.com/DisgoOrg/disgo/api/endpoints"
 	"github.com/DisgoOrg/disgohook"
+	wapi "github.com/DisgoOrg/disgohook/api"
 )
 
 type WebhookCreate struct {
@@ -42,7 +41,7 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	rq := url.Values{
 		"client_id":     {dgo.ApplicationID().String()},
-		"client_secret": {os.Getenv("secret")},
+		"client_secret": {secret},
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
 		"redirect_uri":  {redirectURL},

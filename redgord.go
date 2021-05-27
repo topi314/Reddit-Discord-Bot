@@ -14,6 +14,11 @@ import (
 	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
 
+var token = os.Getenv("token")
+var publicKey = os.Getenv("public_key")
+var secret = os.Getenv("secret")
+var redirectURL = os.Getenv("redirect_url")
+
 var logger = logrus.New()
 var httpClient *http.Client
 var dgo api.Disgo
@@ -29,13 +34,13 @@ func main() {
 	logger.Infof("starting Reddit-Discord-Bot...")
 
 	var err error
-	dgo, err = disgo.NewBuilder(os.Getenv("token")).
+	dgo, err = disgo.NewBuilder(token).
 		SetHTTPClient(httpClient).
 		SetLogger(logger).
 		SetCacheFlags(api.CacheFlagsNone).
 		SetMemberCachePolicy(api.MemberCachePolicyNone).
 		SetMessageCachePolicy(api.MessageCachePolicyNone).
-		SetWebhookServerProperties("/webhooks/interactions/callback", 12345, os.Getenv("public_key")).
+		SetWebhookServerProperties("/webhooks/interactions/callback", 12345, publicKey).
 		AddEventListeners(getListenerAdapter()).
 		Build()
 	if err != nil {

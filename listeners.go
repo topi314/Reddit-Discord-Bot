@@ -7,8 +7,6 @@ import (
 	"github.com/DisgoOrg/disgo/api/events"
 )
 
-const redirectURL = "https://553f0ccaa2d9.ngrok.io/webhooks/create/callback"
-
 var states = map[api.Snowflake]*WebhookCreate{}
 
 var commands = []*api.CommandCreate{
