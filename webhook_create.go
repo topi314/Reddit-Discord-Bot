@@ -5,9 +5,9 @@ import (
 	"net/url"
 
 	"github.com/DisgoOrg/disgo/api"
-	"github.com/DisgoOrg/disgo/api/endpoints"
 	"github.com/DisgoOrg/disgohook"
 	wapi "github.com/DisgoOrg/disgohook/api"
+	"github.com/DisgoOrg/restclient"
 )
 
 type WebhookCreate struct {
@@ -15,7 +15,7 @@ type WebhookCreate struct {
 	Subreddit   string
 }
 
-var tokenURL = endpoints.NewCustomRoute(endpoints.POST, "https://discord.com/api/oauth2/token")
+var tokenURL = restclient.NewCustomRoute(restclient.POST, "https://discord.com/api/oauth2/token")
 
 func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -34,7 +34,7 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	delete(states, state)
 
-	compiledRoute, _ := tokenURL.Compile()
+	compiledRoute, _ := tokenURL.Compile(nil)
 	var rs *struct {
 		wapi.Webhook `json:"webhook"`
 	}
@@ -46,14 +46,15 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 		"code":          {code},
 		"redirect_uri":  {redirectURL},
 	}
-	err := dgo.RestClient().Request(compiledRoute, rq, &rs)
+	var err error
+	err = dgo.RestClient().Do(compiledRoute, rq, &rs)
 	if err != nil {
 		logger.Errorf("error while exchanging code: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	webhookClient, err := disgohook.NewWebhookByIDToken(httpClient, logger, rs.Webhook.ID, *rs.Webhook.Token)
+	webhookClient, err := disgohook.NewWebhookClientByIDToken(httpClient, logger, rs.Webhook.ID, *rs.Webhook.Token)
 	if err != nil {
 		logger.Errorf("error creating webhook client: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)

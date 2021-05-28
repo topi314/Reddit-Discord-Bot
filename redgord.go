@@ -40,7 +40,7 @@ func main() {
 		SetCacheFlags(api.CacheFlagsNone).
 		SetMemberCachePolicy(api.MemberCachePolicyNone).
 		SetMessageCachePolicy(api.MessageCachePolicyNone).
-		SetWebhookServerProperties("/webhooks/interactions/callback", 12345, publicKey).
+		SetWebhookServerProperties("/webhooks/interactions/callback", 80, publicKey).
 		AddEventListeners(getListenerAdapter()).
 		Build()
 	if err != nil {
@@ -52,7 +52,7 @@ func main() {
 	dgo.WebhookServer().Router().HandleFunc("/webhooks/create/callback", webhookCreateHandler).Methods("GET")
 
 	if err = initCommands(); err != nil {
-		logger.Panic("failed to init commands")
+		logger.Panic("failed to init commands: %s", err)
 		return
 	}
 

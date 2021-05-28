@@ -11,8 +11,8 @@ var states = map[api.Snowflake]*WebhookCreate{}
 
 var commands = []*api.CommandCreate{
 	{
-		Name:              "subreddit",
-		Description:       "lets you manage all your subreddits",
+		Name:        "subreddit",
+		Description: "lets you manage all your subreddits",
 		Options: []*api.CommandOption{
 			{
 				Type:        api.CommandOptionTypeSubCommand,
@@ -59,25 +59,25 @@ var commands = []*api.CommandCreate{
 
 func getListenerAdapter() *events.ListenerAdapter {
 	return &events.ListenerAdapter{
-		OnSlashCommand: onSlashCommand,
+		OnCommand: onCommand,
 	}
 }
 
-func onSlashCommand(event *events.SlashCommandEvent) {
+func onCommand(event *events.CommandEvent) {
 	switch event.CommandName {
 	case "subreddit":
 		switch *event.SubCommandName {
 		case "add":
 			states[event.Interaction.ID] = &WebhookCreate{
 				Interaction: event.Interaction,
-				Subreddit: event.Option("subreddit").String(),
+				Subreddit:   event.Option("subreddit").String(),
 			}
-			_ = event.Reply(api.NewInteractionResponseBuilder().
+
+			_ = event.ReplyCreate(api.NewInteractionResponseBuilder().
 				SetEphemeral(true).
 				SetContent("click [here](" + oauth2URL(event.Disgo().ApplicationID(), event.Interaction.ID.String(), redirectURL) + ") to add a new webhook").
-				Build(),
+				BuildData(),
 			)
-
 
 		case "remove":
 
@@ -95,8 +95,3 @@ func initCommands() error {
 func oauth2URL(clientID api.Snowflake, state string, redirectURL string) string {
 	return fmt.Sprintf("https://discord.com/oauth2/authorize?response_type=code&client_id=%s&state=%s&scope=webhook.incoming&redirect_uri=%s", clientID, state, redirectURL)
 }
-
-
-
-
-
