@@ -8,14 +8,15 @@ import (
 	"github.com/DisgoOrg/disgohook"
 	wapi "github.com/DisgoOrg/disgohook/api"
 	"github.com/DisgoOrg/restclient"
+	"gorm.io/gorm"
 )
 
-type WebhookCreate struct {
+var tokenURL = restclient.NewCustomRoute(restclient.POST, "https://discord.com/api/oauth2/token")
+
+type WebhookCreateState struct {
 	Interaction *api.Interaction
 	Subreddit   string
 }
-
-var tokenURL = restclient.NewCustomRoute(restclient.POST, "https://discord.com/api/oauth2/token")
 
 func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -36,7 +37,7 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	compiledRoute, _ := tokenURL.Compile(nil)
 	var rs *struct {
-		wapi.Webhook `json:"webhook"`
+		*wapi.Webhook `json:"webhook"`
 	}
 
 	rq := url.Values{
@@ -61,10 +62,21 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addSubreddit(webhookState.Subreddit, webhookClient)
+	go func() {
+		database.Create(&SubredditSubscription{
+			Model:        gorm.Model{},
+			Subreddit:    webhookState.Subreddit,
+			GuildID:      *rs.Webhook.GuildID,
+			ChannelID:    *rs.Webhook.ChannelID,
+			WebhookID:    webhookClient.ID(),
+			WebhookToken: webhookClient.Token(),
+		})
+	}()
+
+	subscribeToSubreddit(webhookState.Subreddit, webhookClient)
 
 	_, err = webhookClient.SendMessage(wapi.NewWebhookMessageBuilder().
-		SetContent("Webhook successfully created").
+		SetContent("Webhook for [r/" + webhookState.Subreddit + "](https://www.reddit.com/r/" + webhookState.Subreddit + ") successfully created").
 		Build(),
 	)
 	var message *api.FollowupMessageBuilder
