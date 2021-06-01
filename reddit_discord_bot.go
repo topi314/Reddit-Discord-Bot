@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"strconv"
 	"syscall"
 
 	"github.com/DisgoOrg/disgo"
@@ -18,6 +19,7 @@ var token = os.Getenv("token")
 var publicKey = os.Getenv("public_key")
 var secret = os.Getenv("secret")
 var redirectURL = os.Getenv("redirect_url")
+var webhookServerPort, _ = strconv.Atoi(os.Getenv("webhook_server_port"))
 
 var logger = logrus.New()
 var httpClient *http.Client
@@ -29,15 +31,15 @@ var imageRegex = regexp.MustCompile(`.*\.(?:jpg|gif|png)`)
 func main() {
 	httpClient = http.DefaultClient
 
-	logger.SetLevel(logrus.DebugLevel)
+	logger.SetLevel(logrus.InfoLevel)
 	logger.Infof("starting Reddit-Discord-Bot...")
 
 	router := disgommand.NewRouter(logger, true)
 
 	router.HandleFunc("subreddit", "lets you manage all your subreddits", nil, nil)
 	router.HandleFunc("subreddit/add", "adds a new subreddit", nil, onSubredditAdd, api.NewStringOption("subreddit", "the subreddit to add").SetRequired(true))
-	//router.HandleFunc("subreddit/remove", "removes a subreddit", nil, onSubredditRemove, api.NewStringOption("subreddit", "the subreddit to remove").SetRequired(true))
-	//router.HandleFunc("subreddit/list", "lists all added subreddits", nil, onSubredditList, api.NewStringOption("channel", "the channel to list all subreddits from").SetRequired(true))
+	router.HandleFunc("subreddit/remove", "removes a subreddit", nil, onSubredditRemove, api.NewStringOption("subreddit", "the subreddit to remove").SetRequired(true))
+	router.HandleFunc("subreddit/list", "lists all added subreddits", nil, onSubredditList)
 
 	var err error
 	dgo, err = disgo.NewBuilder(token).
@@ -46,7 +48,7 @@ func main() {
 		SetCacheFlags(api.CacheFlagsNone).
 		SetMemberCachePolicy(api.MemberCachePolicyNone).
 		SetMessageCachePolicy(api.MessageCachePolicyNone).
-		SetWebhookServerProperties("/webhooks/interactions/callback", 80, publicKey).
+		SetWebhookServerProperties("/webhooks/interactions/callback", webhookServerPort, publicKey).
 		AddEventListeners(router).
 		Build()
 	if err != nil {

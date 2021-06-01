@@ -8,7 +8,6 @@ import (
 	"github.com/DisgoOrg/disgohook"
 	wapi "github.com/DisgoOrg/disgohook/api"
 	"github.com/DisgoOrg/restclient"
-	"gorm.io/gorm"
 )
 
 var tokenURL = restclient.NewCustomRoute(restclient.POST, "https://discord.com/api/oauth2/token")
@@ -64,7 +63,6 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		database.Create(&SubredditSubscription{
-			Model:        gorm.Model{},
 			Subreddit:    webhookState.Subreddit,
 			GuildID:      *rs.Webhook.GuildID,
 			ChannelID:    *rs.Webhook.ChannelID,

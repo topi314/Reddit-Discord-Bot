@@ -24,15 +24,16 @@ func subscribeToSubreddit(subreddit string, webhookClient wapi.WebhookClient) {
 	}
 }
 
-func unsubscribeFromSubreddit(subreddit string, webhookClient wapi.WebhookClient) {
+func unsubscribeFromSubreddit(subreddit string, webhookID wapi.Snowflake) {
 	logger.Infof("unsubcribing from r/%s", subreddit)
 	_, ok := subreddits[subreddit]
 	if !ok {
 		return
 	}
 	for i, wc := range subreddits[subreddit] {
-		if wc == webhookClient {
+		if wc.ID() == webhookID {
 			subreddits[subreddit] = append(subreddits[subreddit][:i], subreddits[subreddit][i+1:]...)
+			_ = wc.DeleteWebhook()
 			if len(subreddits[subreddit]) == 0 {
 				delete(subreddits, subreddit)
 				subredditChannels[subreddit] <- struct{}{}
