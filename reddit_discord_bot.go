@@ -36,10 +36,10 @@ func main() {
 
 	router := disgommand.NewRouter(logger, true)
 
-	router.HandleFunc("subreddit", "lets you manage all your subreddits", nil, nil)
-	router.HandleFunc("subreddit/add", "adds a new subreddit", nil, onSubredditAdd, api.NewStringOption("subreddit", "the subreddit to add").SetRequired(true))
-	router.HandleFunc("subreddit/remove", "removes a subreddit", nil, onSubredditRemove, api.NewStringOption("subreddit", "the subreddit to remove").SetRequired(true))
-	router.HandleFunc("subreddit/list", "lists all added subreddits", nil, onSubredditList)
+	router.HandleFunc("subreddit", "lets you manage all your subreddits", nil, api.PermissionManageServer, api.PermissionNone, nil)
+	router.HandleFunc("subreddit/add", "adds a new subreddit", nil, api.PermissionManageServer, api.PermissionNone, onSubredditAdd, api.NewStringOption("subreddit", "the subreddit to add").SetRequired(true))
+	router.HandleFunc("subreddit/remove", "removes a subreddit", nil, api.PermissionManageServer, api.PermissionNone, onSubredditRemove, api.NewStringOption("subreddit", "the subreddit to remove").SetRequired(true))
+	router.HandleFunc("subreddit/list", "lists all added subreddits", nil, api.PermissionManageServer, api.PermissionNone, onSubredditList)
 
 	var err error
 	dgo, err = disgo.NewBuilder(token).
