@@ -73,20 +73,16 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	subscribeToSubreddit(webhookState.Subreddit, webhookClient)
 
-	_, err = webhookClient.SendMessage(wapi.NewWebhookMessageBuilder().
+	_, err = webhookClient.SendMessage(wapi.NewWebhookMessageCreateBuilder().
 		SetContent("Webhook for [r/" + webhookState.Subreddit + "](https://www.reddit.com/r/" + webhookState.Subreddit + ") successfully created").
 		Build(),
 	)
-	var message *api.FollowupMessageBuilder
+	message := api.NewMessageCreateBuilder().SetEphemeral(true)
 	if err != nil {
 		logger.Errorf("error while tesing webhook: %s", err)
-		message = api.NewFollowupMessageBuilder().
-			SetEphemeral(true).
-			SetContent("There was a problem setting up your webhook.\nRetry or reach out for help [here](https://discord.gg/sD3ABd5)")
+		message.SetContent("There was a problem setting up your webhook.\nRetry or reach out for help [here](https://discord.gg/sD3ABd5)")
 	} else {
-		message = api.NewFollowupMessageBuilder().
-			SetEphemeral(true).
-			SetContent("Successfully added webhook. Everything is ready to go")
+		message.SetContent("Successfully added webhook. Everything is ready to go")
 	}
 
 	_, err = webhookState.Interaction.SendFollowup(message.Build())

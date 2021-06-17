@@ -36,10 +36,13 @@ func main() {
 
 	router := disgommand.NewRouter(logger, true)
 
-	router.HandleFunc("subreddit", "lets you manage all your subreddits", nil, api.PermissionManageServer, api.PermissionNone, nil)
-	router.HandleFunc("subreddit/add", "adds a new subreddit", nil, api.PermissionManageServer, api.PermissionNone, onSubredditAdd, api.NewStringOption("subreddit", "the subreddit to add").SetRequired(true))
-	router.HandleFunc("subreddit/remove", "removes a subreddit", nil, api.PermissionManageServer, api.PermissionNone, onSubredditRemove, api.NewStringOption("subreddit", "the subreddit to remove").SetRequired(true))
-	router.HandleFunc("subreddit/list", "lists all added subreddits", nil, api.PermissionManageServer, api.PermissionNone, onSubredditList)
+	subredditOption := api.NewStringOption("subreddit", "the subreddit to add")
+	subredditOption.SetRequired(true)
+
+	router.HandleFunc("subreddit", "lets you manage all your subreddits", nil, api.PermissionManageServer, api.PermissionsNone, nil)
+	router.HandleFunc("subreddit/add", "adds a new subreddit", nil, api.PermissionManageServer, api.PermissionsNone, onSubredditAdd, subredditOption)
+	router.HandleFunc("subreddit/remove", "removes a subreddit", nil, api.PermissionManageServer, api.PermissionsNone, onSubredditRemove, subredditOption)
+	router.HandleFunc("subreddit/list", "lists all added subreddits", nil, api.PermissionManageServer, api.PermissionsNone, onSubredditList)
 
 	var err error
 	dgo, err = disgo.NewBuilder(token).

@@ -10,15 +10,15 @@ import (
 
 var states = map[api.Snowflake]*WebhookCreateState{}
 
-func onSubredditAdd(event *events.CommandEvent) error {
+func onSubredditAdd(event events.CommandEvent) error {
 	subreddit := strings.ToLower(event.Option("subreddit").String())
 
 	var subredditSubscription *SubredditSubscription
 	if err := database.Where("subreddit = ? AND guild_id = ?", subreddit, event.Interaction.GuildID).First(&subredditSubscription).Error; err == nil {
-		return event.ReplyCreate(api.NewInteractionResponseBuilder().
+		return event.Reply(api.NewMessageCreateBuilder().
 			SetEphemeral(true).
 			SetContentf("you already added r/%s to this server", subreddit).
-			BuildData(),
+			Build(),
 		)
 	}
 
@@ -27,34 +27,34 @@ func onSubredditAdd(event *events.CommandEvent) error {
 		Subreddit:   subreddit,
 	}
 
-	return event.ReplyCreate(api.NewInteractionResponseBuilder().
+	return event.Reply(api.NewMessageCreateBuilder().
 		SetEphemeral(true).
 		SetContent("click [here](" + oauth2URL(event.Disgo().ApplicationID(), event.Interaction.ID.String(), redirectURL) + ") to add a new webhook").
-		BuildData(),
+		Build(),
 	)
 }
 
-func onSubredditRemove(event *events.CommandEvent) error {
+func onSubredditRemove(event events.CommandEvent) error {
 	subreddit := strings.ToLower(event.Option("subreddit").String())
 
 	var subredditSubscription *SubredditSubscription
 	if err := database.Where("subreddit = ? AND guild_id = ?", subreddit, event.Interaction.GuildID).First(&subredditSubscription).Error; err != nil {
-		return event.ReplyCreate(api.NewInteractionResponseBuilder().
+		return event.Reply(api.NewMessageCreateBuilder().
 			SetEphemeral(true).
 			SetContentf("could not find r/%s linked to any channel", subreddit).
-			BuildData(),
+			Build(),
 		)
 	}
 	database.Delete(subredditSubscription)
 	unsubscribeFromSubreddit(subreddit, subredditSubscription.WebhookID)
-	return event.ReplyCreate(api.NewInteractionResponseBuilder().
+	return event.Reply(api.NewMessageCreateBuilder().
 		SetEphemeral(true).
 		SetContentf("removed r/%s", subreddit).
-		BuildData(),
+		Build(),
 	)
 }
 
-func onSubredditList(event *events.CommandEvent) error {
+func onSubredditList(event events.CommandEvent) error {
 	var subredditSubscriptions []*SubredditSubscription
 	db := database.Where("guild_id = ?", event.Interaction.GuildID).Find(&subredditSubscriptions)
 	var message string
@@ -66,10 +66,10 @@ func onSubredditList(event *events.CommandEvent) error {
 			message += fmt.Sprintf("• r/%s in <#%s>\n", subredditSubscription.Subreddit, subredditSubscription.ChannelID)
 		}
 	}
-	return event.ReplyCreate(api.NewInteractionResponseBuilder().
+	return event.Reply(api.NewMessageCreateBuilder().
 		SetEphemeral(true).
 		SetContentf(message).
-		BuildData(),
+		Build(),
 	)
 }
 
