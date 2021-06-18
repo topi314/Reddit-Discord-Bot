@@ -6,6 +6,7 @@ require (
 	github.com/DisgoOrg/disgo v0.4.3
 	github.com/DisgoOrg/disgohook v1.3.0
 	github.com/DisgoOrg/disgommand v1.2.0
+	github.com/DisgoOrg/dislog v1.0.2
 	github.com/DisgoOrg/restclient v1.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/vartanbeno/go-reddit/v2 v2.0.1

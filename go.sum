@@ -3,12 +3,16 @@ cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/DisgoOrg/disgo v0.4.3 h1:tebX7I/3Z3co082BaD+FgiaA2WFmv057HMvXGIE25KY=
 github.com/DisgoOrg/disgo v0.4.3/go.mod h1:rspA8RMACqcaAlO7pKhE1Cr6aKmqdfr2mZd5K1t0VKo=
+github.com/DisgoOrg/disgohook v1.2.0/go.mod h1:s4p5MIKb/zyG5712iWHr5P1aFMhHE0TrjhyXOENo2+M=
 github.com/DisgoOrg/disgohook v1.3.0 h1:jNQf56fDWV83K6TRmkDoADLcOT/5AnLR+sorit8uzP0=
 github.com/DisgoOrg/disgohook v1.3.0/go.mod h1:IV4FwUIhlWbEBBCdfO9E6mkMIeaMiH9A8jIIt6EP3Cs=
 github.com/DisgoOrg/disgommand v1.2.0 h1:6mmHqNAjGTv07/DwBZuCwt8MEmBT4ZWvu87O5/Pwqyk=
 github.com/DisgoOrg/disgommand v1.2.0/go.mod h1:7J7SiPnFX2TqDMgAh2DYklutPXUSu/5dZSetpytDyFI=
+github.com/DisgoOrg/dislog v1.0.2 h1:4F6Vh/46crsXvjnvVTt5JGHl1qA9NWFB6UeJ1L5sOHs=
+github.com/DisgoOrg/dislog v1.0.2/go.mod h1:LEq7yK5EEXFjbgLmrIUOCn29SGXsaMa5UjhXFlOIp4w=
 github.com/DisgoOrg/log v1.0.3 h1:IjmZQQu/kuBIui22EdXmxzQGYwcPCJEkXa0Fe6W9fJk=
 github.com/DisgoOrg/log v1.0.3/go.mod h1:KFGKhBQr37d6rxZ7p2bmc8BEmDH8DZbtgdlJDSCsE7I=
+github.com/DisgoOrg/restclient v1.1.4/go.mod h1:PIhyYsT52w5T6m4LT+HTdKqY6NOIqo71Ai0rgaq9ZtM=
 github.com/DisgoOrg/restclient v1.1.5 h1:qjYNUeFo2NcqaMS+lLxyQIwED1gomn5TIub88wrA2mI=
 github.com/DisgoOrg/restclient v1.1.5/go.mod h1:PIhyYsT52w5T6m4LT+HTdKqY6NOIqo71Ai0rgaq9ZtM=
 github.com/DisgoOrg/restclient v1.2.0 h1:M2GXPf5Ja+Ynt7DBTLv+TQ4iMVLQX17FRHXQ0gqAExw=

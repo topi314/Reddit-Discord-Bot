@@ -11,27 +11,36 @@ import (
 	"github.com/DisgoOrg/disgo"
 	"github.com/DisgoOrg/disgo/api"
 	"github.com/DisgoOrg/disgommand"
+	"github.com/DisgoOrg/dislog"
 	"github.com/sirupsen/logrus"
 	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
 
 var token = os.Getenv("token")
+var logWebhookToken = os.Getenv("log_webhook_token")
 var publicKey = os.Getenv("public_key")
 var secret = os.Getenv("secret")
 var redirectURL = os.Getenv("redirect_url")
 var webhookServerPort, _ = strconv.Atoi(os.Getenv("webhook_server_port"))
 
 var logger = logrus.New()
-var httpClient *http.Client
+var httpClient =  http.DefaultClient
 var dgo api.Disgo
 var redditClient *reddit.Client
 
 var imageRegex = regexp.MustCompile(`.*\.(?:jpg|gif|png)`)
 
 func main() {
-	httpClient = http.DefaultClient
-
 	logger.SetLevel(logrus.InfoLevel)
+
+	dlog, err := dislog.NewDisLogByToken(httpClient, logrus.InfoLevel, logWebhookToken, dislog.InfoLevelAndAbove...)
+	if err != nil {
+		logger.Errorf("error initializing dislog %s", err)
+		return
+	}
+	defer dlog.Close()
+
+	logger.AddHook(dlog)
 	logger.Infof("starting Reddit-Discord-Bot...")
 
 	router := disgommand.NewRouter(logger, true)
@@ -44,7 +53,6 @@ func main() {
 	router.HandleFunc("subreddit/remove", "removes a subreddit", nil, api.PermissionManageServer, api.PermissionsNone, onSubredditRemove, subredditOption)
 	router.HandleFunc("subreddit/list", "lists all added subreddits", nil, api.PermissionManageServer, api.PermissionsNone, onSubredditList)
 
-	var err error
 	dgo, err = disgo.NewBuilder(token).
 		SetHTTPClient(httpClient).
 		SetLogger(logger).
