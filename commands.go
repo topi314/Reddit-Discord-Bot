@@ -45,7 +45,6 @@ func onSubredditRemove(event events.CommandEvent) error {
 			Build(),
 		)
 	}
-	database.Delete(subredditSubscription)
 	unsubscribeFromSubreddit(subreddit, subredditSubscription.WebhookID)
 	return event.Reply(api.NewMessageCreateBuilder().
 		SetEphemeral(true).

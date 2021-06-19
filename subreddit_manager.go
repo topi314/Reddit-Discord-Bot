@@ -9,7 +9,7 @@ var subreddits = map[string][]wapi.WebhookClient{}
 var subredditChannels = map[string]chan struct{}{}
 
 func subscribeToSubreddit(subreddit string, webhookClient wapi.WebhookClient) {
-	logger.Infof("subcribing to r/%s", subreddit)
+	logger.Infof("subscribing to r/%s", subreddit)
 	_, ok := subreddits[subreddit]
 	if !ok {
 		subreddits[subreddit] = []wapi.WebhookClient{}
@@ -34,6 +34,7 @@ func unsubscribeFromSubreddit(subreddit string, webhookID wapi.Snowflake) {
 		if wc.ID() == webhookID {
 			subreddits[subreddit] = append(subreddits[subreddit][:i], subreddits[subreddit][i+1:]...)
 			_ = wc.DeleteWebhook()
+			database.Delete("webhook_id = ?", webhookID)
 			if len(subreddits[subreddit]) == 0 {
 				delete(subreddits, subreddit)
 				subredditChannels[subreddit] <- struct{}{}
@@ -43,13 +44,13 @@ func unsubscribeFromSubreddit(subreddit string, webhookID wapi.Snowflake) {
 }
 
 func listenToSubreddit(subreddit string, quit chan struct{}) {
-	logger.Infof("listeninmg to r/%s", subreddit)
+	logger.Infof("listening to r/%s", subreddit)
 	postCount := 0
 	posts, errs, _ := redditClient.Stream.Posts(subreddit)
 	for {
 		select {
 		case <-quit:
-			logger.Infof("shutting down reddit post stream...")
+			logger.Infof("stop listening to r/%s", subreddit)
 			return
 		case post := <-posts:
 			postCount++
