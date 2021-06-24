@@ -1,8 +1,11 @@
 package main
 
 import (
+	"time"
+
 	"github.com/DisgoOrg/disgohook"
 	wapi "github.com/DisgoOrg/disgohook/api"
+	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
 
 var subreddits = map[string][]wapi.WebhookClient{}
@@ -45,18 +48,13 @@ func unsubscribeFromSubreddit(subreddit string, webhookID wapi.Snowflake) {
 
 func listenToSubreddit(subreddit string, quit chan struct{}) {
 	logger.Infof("listening to r/%s", subreddit)
-	postCount := 0
-	posts, errs, _ := redditClient.Stream.Posts(subreddit)
+	posts, errs, _ := redditClient.Stream.Posts(subreddit, reddit.StreamInterval(time.Second*30), reddit.StreamDiscardInitial)
 	for {
 		select {
 		case <-quit:
 			logger.Infof("stop listening to r/%s", subreddit)
 			return
 		case post := <-posts:
-			postCount++
-			if postCount <= 100 {
-				continue
-			}
 			description := post.Body
 			if len(description) > 2048 {
 				description = string([]rune(description)[0:2045]) + "..."
