@@ -27,7 +27,7 @@ func subscribeToSubreddit(subreddit string, webhookClient wapi.WebhookClient) {
 	}
 }
 
-func unsubscribeFromSubreddit(subreddit string, webhookID wapi.Snowflake) {
+func unsubscribeFromSubreddit(subreddit string, webhookID wapi.Snowflake, deleteWebhook bool) {
 	logger.Debugf("unsubcribing from r/%s", subreddit)
 	_, ok := subreddits[subreddit]
 	if !ok {
@@ -36,9 +36,11 @@ func unsubscribeFromSubreddit(subreddit string, webhookID wapi.Snowflake) {
 	for i, wc := range subreddits[subreddit] {
 		if wc.ID() == webhookID {
 			subreddits[subreddit] = append(subreddits[subreddit][:i], subreddits[subreddit][i+1:]...)
-			err := wc.DeleteWebhook()
-			if err != nil {
-				logger.Errorf("error while deleting wehook: %s", err)
+			if deleteWebhook {
+				err := wc.DeleteWebhook()
+				if err != nil {
+					logger.Errorf("error while deleting wehook: %s", err)
+				}
 			}
 			database.Delete(&SubredditSubscription{}, "webhook_id = ?", webhookID)
 			if len(subreddits[subreddit]) == 0 {
@@ -85,7 +87,7 @@ func listenToSubreddit(subreddit string, quit chan struct{}) {
 				if err != nil {
 					if err.Response().StatusCode == 404 {
 						logger.Errorf("found deleted webhook. unsubscribing from subreddit...")
-						unsubscribeFromSubreddit(subreddit, webhookClient.ID())
+						unsubscribeFromSubreddit(subreddit, webhookClient.ID(), false)
 						continue
 					}
 					logger.Errorf("error while sending post to webhook: %s", err)

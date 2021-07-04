@@ -45,7 +45,7 @@ func onSubredditRemove(event events.CommandEvent) error {
 			Build(),
 		)
 	}
-	unsubscribeFromSubreddit(subreddit, subredditSubscription.WebhookID)
+	unsubscribeFromSubreddit(subreddit, subredditSubscription.WebhookID, true)
 	return event.Reply(api.NewMessageCreateBuilder().
 		SetEphemeral(true).
 		SetContentf("removed r/%s", subreddit).
