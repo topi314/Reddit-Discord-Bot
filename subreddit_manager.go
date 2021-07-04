@@ -40,7 +40,7 @@ func unsubscribeFromSubreddit(subreddit string, webhookID wapi.Snowflake) {
 			if err != nil {
 				logger.Errorf("error while deleting wehook: %s", err)
 			}
-			database.Delete("webhook_id = ?", webhookID)
+			database.Delete(&SubredditSubscription{}, "webhook_id = ?", webhookID)
 			if len(subreddits[subreddit]) == 0 {
 				delete(subreddits, subreddit)
 				subredditChannels[subreddit] <- struct{}{}
