@@ -33,14 +33,17 @@ var imageRegex = regexp.MustCompile(`.*\.(?:jpg|gif|png)`)
 func main() {
 	logger.SetLevel(logrus.InfoLevel)
 
-	dlog, err := dislog.NewDisLogByToken(httpClient, logrus.InfoLevel, logWebhookToken, dislog.InfoLevelAndAbove...)
-	if err != nil {
-		logger.Errorf("error initializing dislog %s", err)
-		return
-	}
-	defer dlog.Close()
+	if logWebhookToken != "" {
+		dlog, err := dislog.NewDisLogByToken(httpClient, logrus.InfoLevel, logWebhookToken, dislog.InfoLevelAndAbove...)
+		if err != nil {
+			logger.Errorf("error initializing dislog %s", err)
+			return
+		}
+		defer dlog.Close()
 
-	logger.AddHook(dlog)
+		logger.AddHook(dlog)
+	}
+
 	logger.Infof("starting Reddit-Discord-Bot...")
 
 	router := disgommand.NewRouter(logger, true)
@@ -53,6 +56,7 @@ func main() {
 	router.HandleFunc("subreddit/remove", "removes a subreddit", nil, api.PermissionManageServer, api.PermissionsNone, onSubredditRemove, subredditOption)
 	router.HandleFunc("subreddit/list", "lists all added subreddits", nil, api.PermissionManageServer, api.PermissionsNone, onSubredditList)
 
+	var err error
 	dgo, err = disgo.NewBuilder(token).
 		SetHTTPClient(httpClient).
 		SetLogger(logger).

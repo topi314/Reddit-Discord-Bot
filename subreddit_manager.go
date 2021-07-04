@@ -81,7 +81,7 @@ func listenToSubreddit(subreddit string, quit chan struct{}) {
 				Build()
 
 			for _, webhookClient := range subreddits[subreddit] {
-				_, err := webhookClient.SendEmbed(embed)
+				_, err := webhookClient.SendEmbeds(embed)
 				if err != nil {
 					if err.Response().StatusCode == 404 {
 						logger.Errorf("found deleted webhook. unsubscribing from subreddit...")
