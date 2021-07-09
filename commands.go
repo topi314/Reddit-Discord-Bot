@@ -10,7 +10,7 @@ import (
 
 var states = map[api.Snowflake]*WebhookCreateState{}
 
-func onSubredditAdd(event events.CommandEvent) error {
+func onSubredditAdd(event *events.CommandEvent) error {
 	subreddit := strings.ToLower(event.Option("subreddit").String())
 
 	var subredditSubscription *SubredditSubscription
@@ -34,7 +34,7 @@ func onSubredditAdd(event events.CommandEvent) error {
 	)
 }
 
-func onSubredditRemove(event events.CommandEvent) error {
+func onSubredditRemove(event *events.CommandEvent) error {
 	subreddit := strings.ToLower(event.Option("subreddit").String())
 
 	var subredditSubscription *SubredditSubscription
@@ -53,7 +53,7 @@ func onSubredditRemove(event events.CommandEvent) error {
 	)
 }
 
-func onSubredditList(event events.CommandEvent) error {
+func onSubredditList(event *events.CommandEvent) error {
 	var subredditSubscriptions []*SubredditSubscription
 	db := database.Where("guild_id = ?", event.Interaction.GuildID).Find(&subredditSubscriptions)
 	var message string
