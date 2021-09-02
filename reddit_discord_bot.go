@@ -52,8 +52,7 @@ func main() {
 
 	router := disgommand.NewRouter(logger, true)
 
-	subredditOption := api.NewStringOption("subreddit", "the subreddit to add")
-	subredditOption.SetRequired(true)
+	subredditOption := api.NewStringOption("subreddit", "the subreddit to add or remove").SetRequired(true)
 
 	router.HandleFunc("subreddit", "lets you manage all your subreddits", nil, api.PermissionManageServer, api.PermissionsNone, nil)
 	router.HandleFunc("subreddit/add", "adds a new subreddit", nil, api.PermissionManageServer, api.PermissionsNone, onSubredditAdd, subredditOption)
