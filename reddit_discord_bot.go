@@ -78,6 +78,7 @@ func main() {
 
 	dgo.Start()
 	dgo.WebhookServer().Router().HandleFunc("/webhooks/create/callback", webhookCreateHandler).Methods("GET")
+	dgo.WebhookServer().Router().HandleFunc("/success", webhookCreateSuccessHandler).Methods("GET")
 
 	redditClient, err = reddit.NewReadonlyClient()
 	if err != nil {
