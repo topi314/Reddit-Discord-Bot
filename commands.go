@@ -29,7 +29,7 @@ func onSubredditAdd(event *events.CommandEvent) error {
 
 	return event.Reply(api.NewMessageCreateBuilder().
 		SetEphemeral(true).
-		SetContent("click [here](" + oauth2URL(event.Disgo().ApplicationID(), event.Interaction.ID.String(), redirectURL) + ") to add a new webhook").
+		SetContent("click [here](" + oauth2URL(event.Disgo().ApplicationID(), event.Interaction.ID.String(), redirectURL, event.Interaction.GuildID) + ") to add a new webhook").
 		Build(),
 	)
 }
@@ -72,6 +72,10 @@ func onSubredditList(event *events.CommandEvent) error {
 	)
 }
 
-func oauth2URL(clientID api.Snowflake, state string, redirectURL string) string {
-	return fmt.Sprintf("https://discord.com/oauth2/authorize?response_type=code&client_id=%s&state=%s&scope=webhook.incoming&redirect_uri=%s", clientID, state, redirectURL)
+func oauth2URL(clientID api.Snowflake, state string, redirectURL string, guildID *api.Snowflake) string {
+	url := fmt.Sprintf("https://discord.com/oauth2/authorize?response_type=code&client_id=%s&state=%s&scope=webhook.incoming&redirect_uri=%s", clientID, state, redirectURL)
+	if guildID != nil {
+		url += fmt.Sprintf("&guild_id=%s", *guildID)
+	}
+	return url
 }
