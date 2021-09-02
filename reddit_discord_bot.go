@@ -16,22 +16,26 @@ import (
 	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
 
-var token = os.Getenv("token")
-var logWebhookToken = os.Getenv("log_webhook_token")
-var publicKey = os.Getenv("public_key")
-var secret = os.Getenv("secret")
-var redirectURL = os.Getenv("redirect_url")
-var webhookServerPort, _ = strconv.Atoi(os.Getenv("webhook_server_port"))
+var (
+	token = os.Getenv("token")
 
-var logger = logrus.New()
-var httpClient =  http.DefaultClient
-var dgo api.Disgo
-var redditClient *reddit.Client
+	logWebhookToken      = os.Getenv("log_webhook_token")
+	publicKey            = os.Getenv("public_key")
+	secret               = os.Getenv("secret")
+	redirectURL          = os.Getenv("redirect_url")
+	webhookServerPort, _ = strconv.Atoi(os.Getenv("webhook_server_port"))
+	loglevel, _          = logrus.ParseLevel(os.Getenv("log_level"))
+
+	logger       = logrus.New()
+	httpClient   = http.DefaultClient
+	dgo          api.Disgo
+	redditClient *reddit.Client
+)
 
 var imageRegex = regexp.MustCompile(`.*\.(?:jpg|gif|png)`)
 
 func main() {
-	logger.SetLevel(logrus.InfoLevel)
+	logger.SetLevel(loglevel)
 
 	if logWebhookToken != "" {
 		dlog, err := dislog.NewDisLogByToken(httpClient, logrus.InfoLevel, logWebhookToken, dislog.InfoLevelAndAbove...)
