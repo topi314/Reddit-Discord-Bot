@@ -16,13 +16,19 @@ import (
 	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
 
+const (
+	InteractionCallbackURL = "/webhooks/interactions/callback"
+	CreateCallbackURL      = "/webhooks/create/callback"
+	SuccessURL             = "/success"
+)
+
 var (
 	token = os.Getenv("token")
 
 	logWebhookToken      = os.Getenv("log_webhook_token")
 	publicKey            = os.Getenv("public_key")
 	secret               = os.Getenv("secret")
-	redirectURL          = os.Getenv("redirect_url")
+	baseURL              = os.Getenv("base_url")
 	webhookServerPort, _ = strconv.Atoi(os.Getenv("webhook_server_port"))
 	loglevel, _          = logrus.ParseLevel(os.Getenv("log_level"))
 
@@ -30,9 +36,9 @@ var (
 	httpClient   = http.DefaultClient
 	dgo          api.Disgo
 	redditClient *reddit.Client
-)
 
-var imageRegex = regexp.MustCompile(`.*\.(?:jpg|gif|png)`)
+	imageRegex = regexp.MustCompile(`.*\.(?:jpg|gif|png)`)
+)
 
 func main() {
 	logger.SetLevel(loglevel)
@@ -66,7 +72,7 @@ func main() {
 		SetCacheFlags(api.CacheFlagsNone).
 		SetMemberCachePolicy(api.MemberCachePolicyNone).
 		SetMessageCachePolicy(api.MessageCachePolicyNone).
-		SetWebhookServerProperties("/webhooks/interactions/callback", webhookServerPort, publicKey).
+		SetWebhookServerProperties(InteractionCallbackURL, webhookServerPort, publicKey).
 		AddEventListeners(router).
 		Build()
 	if err != nil {
@@ -77,8 +83,8 @@ func main() {
 	_ = router.CreateGlobalCommands(dgo)
 
 	dgo.Start()
-	dgo.WebhookServer().Router().HandleFunc("/webhooks/create/callback", webhookCreateHandler).Methods("GET")
-	dgo.WebhookServer().Router().HandleFunc("/success", webhookCreateSuccessHandler).Methods("GET")
+	dgo.WebhookServer().Router().HandleFunc(CreateCallbackURL, webhookCreateHandler).Methods("GET")
+	dgo.WebhookServer().Router().HandleFunc(SuccessURL, webhookCreateSuccessHandler).Methods("GET")
 
 	redditClient, err = reddit.NewReadonlyClient()
 	if err != nil {

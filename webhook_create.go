@@ -44,7 +44,7 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 		"client_secret": {secret},
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
-		"redirect_uri":  {redirectURL},
+		"redirect_uri":  {baseURL + CreateCallbackURL},
 	}
 	var err error
 	err = dgo.RestClient().Do(compiledRoute, rq, &rs)
@@ -92,11 +92,11 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, redirectURL+"/success", http.StatusSeeOther)
+	http.Redirect(w, r, baseURL+SuccessURL, http.StatusSeeOther)
 }
 
 func webhookCreateSuccessHandler(w http.ResponseWriter, _ *http.Request) {
-	writeMessage(w, http.StatusOK, `subreddit successfully created.<br />You can now close this site<br /><br />nFor further questions you can reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a>`)
+	writeMessage(w, http.StatusOK, `subreddit successfully created.<br />You can now close this site<br /><br />For further questions you can reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a>`)
 }
 
 func writeError(w http.ResponseWriter) {

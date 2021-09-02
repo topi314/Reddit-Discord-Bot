@@ -29,7 +29,7 @@ func onSubredditAdd(event *events.CommandEvent) error {
 
 	return event.Reply(api.NewMessageCreateBuilder().
 		SetEphemeral(true).
-		SetContent("click [here](" + oauth2URL(event.Disgo().ApplicationID(), event.Interaction.ID.String(), redirectURL, event.Interaction.GuildID) + ") to add a new webhook").
+		SetContent("click [here](" + oauth2URL(event.Disgo().ApplicationID(), event.Interaction.ID.String(), baseURL + CreateCallbackURL, event.Interaction.GuildID) + ") to add a new webhook").
 		Build(),
 	)
 }
