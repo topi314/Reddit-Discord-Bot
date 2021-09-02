@@ -23,15 +23,13 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 	state := api.Snowflake(query.Get("state"))
 	guildID := query.Get("guild_id")
 	if code == "" || state == "" || guildID == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("missing info<br />Retry or reach out <a href=\"https://discord.gg/sD3ABd5\" target=\"_blank\">here</a> for help"))
+		writeMessage(w, http.StatusBadRequest, `missing info<br />Retry or reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a> for help`)
 		return
 	}
 
 	webhookState, ok := states[state]
 	if !ok {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte("state not found or expired<br />Retry or reach out <a href=\"https://discord.gg/sD3ABd5\" target=\"_blank\">here</a> for help"))
+		writeMessage(w, http.StatusForbidden, `state not found or expired<br />Retry or reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a> for help`)
 		return
 	}
 	delete(states, state)
@@ -94,15 +92,19 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, redirectURL + "/success", http.StatusSeeOther)
+	http.Redirect(w, r, redirectURL+"/success", http.StatusSeeOther)
 }
 
-func webhookCreateSuccessHandler(w http.ResponseWriter, r *http.Request){
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`subreddit successfully created.<br />You can now close this site<br /><br />nFor further questions you can reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a>`))
+func webhookCreateSuccessHandler(w http.ResponseWriter, _ *http.Request) {
+	writeMessage(w, http.StatusOK, `subreddit successfully created.<br />You can now close this site<br /><br />nFor further questions you can reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a>`)
 }
 
 func writeError(w http.ResponseWriter) {
-	w.WriteHeader(http.StatusInternalServerError)
-	_, _ = w.Write([]byte(`There was a problem setting up your subreddit notifications<br />Retry or reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a> for help`))
+	writeMessage(w, http.StatusInternalServerError, `There was a problem setting up your subreddit notifications<br />Retry or reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a> for help`)
+}
+
+func writeMessage(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(message))
 }
