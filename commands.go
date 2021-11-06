@@ -27,14 +27,13 @@ func onSubredditAdd(event *events.CommandEvent) error {
 	subreddit := strings.ToLower(name)
 
 	if _, resp, err := redditClient.Subreddit.Get(context.Background(), subreddit); err != nil {
-		if resp != nil && resp.Response.StatusCode == http.StatusNotFound {
-			return event.Reply(api.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContentf("could not find `r/%s`.", name).
-				Build(),
-			)
-		}
 		return err
+	} else if resp != nil && resp.Response.StatusCode == http.StatusNotFound {
+		return event.Reply(api.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContentf("could not find `r/%s`.", name).
+			Build(),
+		)
 	}
 
 	var subredditSubscription *SubredditSubscription
