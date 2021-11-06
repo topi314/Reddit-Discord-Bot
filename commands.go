@@ -1,23 +1,47 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/DisgoOrg/disgo/api"
 	"github.com/DisgoOrg/disgo/api/events"
 )
 
+var subredditNamePattern = regexp.MustCompile(`\A[A-Za-z0-9][A-Za-z0-9_]{2,20}`)
+
 var states = map[api.Snowflake]*WebhookCreateState{}
 
 func onSubredditAdd(event *events.CommandEvent) error {
-	subreddit := strings.ToLower(event.Option("subreddit").String())
+	name := event.Option("subreddit").String()
+	if !subredditNamePattern.MatchString(name) {
+		return event.Reply(api.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContentf("`%s` is not a valid subreddit name. paste just the name.", name).
+			Build(),
+		)
+	}
+	subreddit := strings.ToLower(name)
+
+	if _, resp, err := redditClient.Subreddit.Get(context.Background(), subreddit); err != nil {
+		if resp != nil && resp.Response.StatusCode == http.StatusNotFound {
+			return event.Reply(api.NewMessageCreateBuilder().
+				SetEphemeral(true).
+				SetContentf("could not find `r/%s`.", name).
+				Build(),
+			)
+		}
+		return err
+	}
 
 	var subredditSubscription *SubredditSubscription
 	if err := database.Where("subreddit = ? AND guild_id = ?", subreddit, event.Interaction.GuildID).First(&subredditSubscription).Error; err == nil {
 		return event.Reply(api.NewMessageCreateBuilder().
 			SetEphemeral(true).
-			SetContentf("you already added r/%s to this server", subreddit).
+			SetContentf("you already added `r/%s` to this server", subreddit).
 			Build(),
 		)
 	}
@@ -29,7 +53,7 @@ func onSubredditAdd(event *events.CommandEvent) error {
 
 	return event.Reply(api.NewMessageCreateBuilder().
 		SetEphemeral(true).
-		SetContent("click [here](" + oauth2URL(event.Disgo().ApplicationID(), event.Interaction.ID.String(), baseURL + CreateCallbackURL, event.Interaction.GuildID) + ") to add a new webhook").
+		SetContent("click [here](" + oauth2URL(event.Disgo().ApplicationID(), event.Interaction.ID.String(), baseURL+CreateCallbackURL, event.Interaction.GuildID) + ") to add a new webhook").
 		Build(),
 	)
 }

@@ -14,4 +14,4 @@ services:
 
 networks:
     reddit-discord-bot:
-        name:  reddit-discord-bot
+        name: reddit-discord-bot
