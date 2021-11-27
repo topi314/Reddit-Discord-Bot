@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"time"
 
 	"github.com/DisgoOrg/disgohook"
@@ -92,7 +93,11 @@ func listenToSubreddit(subreddit string, quit chan struct{}) {
 						unsubscribeFromSubreddit(subreddit, webhookClient.ID(), false)
 						continue
 					}
-					logger.Errorf("error while sending post to webhook: %s", err)
+					var body []byte
+					if err.Response() != nil {
+						body, _ = ioutil.ReadAll(err.Response().Body)
+					}
+					logger.Errorf("error while sending post to webhook: %s, body: %s", err, string(body))
 				}
 
 			}
