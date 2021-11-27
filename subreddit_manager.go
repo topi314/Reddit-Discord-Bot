@@ -53,7 +53,7 @@ func unsubscribeFromSubreddit(subreddit string, webhookID wapi.Snowflake, delete
 
 func listenToSubreddit(subreddit string, quit chan struct{}) {
 	logger.Debugf("listening to r/%s", subreddit)
-	posts, errs, closer := redditClient.Stream.Posts(subreddit, reddit.StreamInterval(time.Second*30), reddit.StreamDiscardInitial)
+	posts, errs, closer := redditClient.Stream.Posts(subreddit, reddit.StreamInterval(time.Minute*2), reddit.StreamDiscardInitial)
 	for {
 		select {
 		case <-quit:
