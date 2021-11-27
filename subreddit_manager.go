@@ -47,8 +47,10 @@ func unsubscribeFromSubreddit(subreddit string, webhookID wapi.Snowflake, delete
 				delete(subreddits, subreddit)
 				subredditChannels[subreddit] <- struct{}{}
 			}
+			return
 		}
 	}
+	logger.Warnf("could not find webhook `%s` to remove", webhookID)
 }
 
 func listenToSubreddit(subreddit string, quit chan struct{}) {
@@ -86,7 +88,7 @@ func listenToSubreddit(subreddit string, quit chan struct{}) {
 				_, err := webhookClient.SendEmbeds(embed)
 				if err != nil {
 					if err.Response().StatusCode == 404 {
-						logger.Errorf("found deleted webhook. unsubscribing from subreddit...")
+						logger.Errorf("found deleted webhook(%s). unsubscribing from subreddit...", webhookClient.ID())
 						unsubscribeFromSubreddit(subreddit, webhookClient.ID(), false)
 						continue
 					}
