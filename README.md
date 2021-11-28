@@ -2,7 +2,7 @@
 
 Simple webhook based bot delivering Reddit posts into your Discord Server
 
-The bot does not require any permissions and can't do anything in your Discord. With that it's save to add!
+The bot does not require any permissions and can't do anything in your Discord. With that it's safe to add!
 
 # Setup
 
@@ -22,7 +22,7 @@ select the server & channel in the discord popup & hit okay that's all!
 
 ## Remove Subreddit
 
-To remove a subreddit subscribtion run
+To remove a subreddit subscriptions run
 
 ```bash
 /subreddit remove <subreddit-name>
@@ -32,7 +32,7 @@ To remove a subreddit subscribtion run
 
 ## List Subreddits
 
-To list all subreddit subscribtions run
+To list all subreddit subscriptions run
 
 ```bash
 /subreddit list
