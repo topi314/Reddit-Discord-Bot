@@ -4,23 +4,21 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/DisgoOrg/disgo/api"
-	"github.com/DisgoOrg/disgohook"
-	wapi "github.com/DisgoOrg/disgohook/api"
-	"github.com/DisgoOrg/restclient"
+	"github.com/DisgoOrg/disgo/core"
+	"github.com/DisgoOrg/disgo/discord"
+	"github.com/DisgoOrg/disgo/rest"
+	"github.com/DisgoOrg/disgo/webhook"
 )
 
-var tokenURL = restclient.NewCustomRoute(restclient.POST, "https://discord.com/api/oauth2/token")
-
 type WebhookCreateState struct {
-	Interaction *api.Interaction
+	Interaction *core.SlashCommandInteraction
 	Subreddit   string
 }
 
 func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	code := query.Get("code")
-	state := api.Snowflake(query.Get("state"))
+	state := discord.Snowflake(query.Get("state"))
 	guildID := query.Get("guild_id")
 	if code == "" || state == "" || guildID == "" {
 		writeMessage(w, http.StatusBadRequest, `missing info<br />Retry or reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a> for help`)
@@ -36,25 +34,30 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	compiledRoute, _ := tokenURL.Compile(nil)
 	var rs *struct {
-		*wapi.Webhook `json:"webhook"`
+		*w.Webhook `json:"webhook"`
 	}
 
 	rq := url.Values{
-		"client_id":     {dgo.ApplicationID().String()},
+		"client_id":     {},
 		"client_secret": {secret},
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
 		"redirect_uri":  {baseURL + CreateCallbackURL},
 	}
 	var err error
-	err = dgo.RestClient().Do(compiledRoute, rq, &rs)
+	err = disgo.RestServices.RestClient().Do(compiledRoute, rq, &rs)
 	if err != nil {
 		logger.Errorf("error while exchanging code: %s", err)
 		writeError(w)
 		return
 	}
 
-	webhookClient, err := disgohook.NewWebhookClientByIDToken(httpClient, logger, rs.Webhook.ID, *rs.Webhook.Token)
+	webhookClient := webhook.NewClient(rs.Webhook.ID(), *rs.Webhook.Token,
+		webhook.WithRestClientConfigOpts(
+			rest.WithHTTPClient(httpClient),
+		),
+		webhook.WithLogger(logger),
+	)
 	if err != nil {
 		logger.Errorf("error creating webhook client: %s", err)
 		writeError(w)
