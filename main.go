@@ -102,7 +102,7 @@ func main() {
 		oauth2.WithRestClientConfigOpts(
 			rest.WithHTTPClient(httpClient),
 		),
-		oauth2.WithStateController()
+		oauth2.WithSessionController(&CustomSessionController{}),
 	)
 
 	if err = disgo.StartHTTPServer(); err != nil {

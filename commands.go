@@ -13,7 +13,6 @@ import (
 
 var subredditNamePattern = regexp.MustCompile(`\A[A-Za-z0-9][A-Za-z0-9_]{2,20}`)
 
-var states = map[string]*WebhookCreateState{}
 
 var commands = []discord.ApplicationCommandCreate{
 	discord.SlashCommandCreate{
@@ -64,8 +63,10 @@ func onSlashCommand(event *events.SlashCommandEvent) {
 		switch *event.Data.SubCommandName {
 		case "add":
 			err = onSubredditAdd(event)
+
 		case "remove":
 			err = onSubredditRemove(event)
+
 		case "list":
 			err = onSubredditList(event)
 		}
@@ -105,14 +106,16 @@ func onSubredditAdd(event *events.SlashCommandEvent) error {
 		)
 	}
 
-	states[event.ID] = &WebhookCreateState{
+	url, state := oauth2Client.GenerateAuthorizationURLState(baseURL+CreateCallbackURL, 0, *event.GuildID, false, discord.ApplicationScopeWebhookIncoming)
+
+	webhookCreateStates[state] = WebhookCreateState{
 		Interaction: event.SlashCommandInteraction,
 		Subreddit:   subreddit,
 	}
 
 	return event.Create(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
-		SetContent("click [here](" + oauth2Client.GenerateAuthorizationURL(baseURL+CreateCallbackURL, 0, *event.GuildID, false, discord.ApplicationScopeWebhookIncoming) + ") to add a new webhook").
+		SetContentf("click [here](%s) to add a new webhook", url).
 		Build(),
 	)
 }
@@ -153,12 +156,4 @@ func onSubredditList(event *events.SlashCommandEvent) error {
 		SetContentf(message).
 		Build(),
 	)
-}
-
-func oauth2URL(clientID discord.Snowflake, state string, redirectURL string, guildID *discord.Snowflake) string {
-	url := fmt.Sprintf("https://discord.com/oauth2/authorize?response_type=code&client_id=%s&state=%s&scope=webhook.incoming&redirect_uri=%s", clientID, state, redirectURL)
-	if guildID != nil {
-		url += fmt.Sprintf("&guild_id=%s", *guildID)
-	}
-	return url
 }
