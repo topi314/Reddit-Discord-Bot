@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	wapi "github.com/DisgoOrg/disgohook/api"
+	"github.com/DisgoOrg/disgo/discord"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -19,11 +19,11 @@ var dbName = os.Getenv("db_name")
 var database *gorm.DB
 
 type SubredditSubscription struct {
-	ID           uint           `gorm:"primarykey"`
-	Subreddit    string         `gorm:"uniqueIndex:Subreddit_ChannelID"`
-	GuildID      wapi.Snowflake `gorm:"uniqueIndex:Subreddit_ChannelID"`
-	ChannelID    wapi.Snowflake
-	WebhookID    wapi.Snowflake
+	ID           uint              `gorm:"primarykey"`
+	Subreddit    string            `gorm:"uniqueIndex:Subreddit_ChannelID"`
+	GuildID      discord.Snowflake `gorm:"uniqueIndex:Subreddit_ChannelID"`
+	ChannelID    discord.Snowflake
+	WebhookID    discord.Snowflake
 	WebhookToken string
 }
 
