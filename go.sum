@@ -2,8 +2,8 @@ cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/DisgoOrg/disgo v0.6.1/go.mod h1:fUybH2+qCyaMbv2Zmwlm8OVU9o6ooT3mzgYLZ6R3meM=
-github.com/DisgoOrg/disgo v0.6.3 h1:Cf7uiJKDm+Be5PoVfKtRa/UBDrlWsiiy1idhvrNNaGQ=
-github.com/DisgoOrg/disgo v0.6.3/go.mod h1:fUybH2+qCyaMbv2Zmwlm8OVU9o6ooT3mzgYLZ6R3meM=
+github.com/DisgoOrg/disgo v0.6.5 h1:oA95GeW9fAD4/eJZcQJaYpQBxbRCkmSvl7Z1rjv7agE=
+github.com/DisgoOrg/disgo v0.6.5/go.mod h1:fUybH2+qCyaMbv2Zmwlm8OVU9o6ooT3mzgYLZ6R3meM=
 github.com/DisgoOrg/dislog v1.0.5 h1:rc/lkH9oAubynMN3nqXNYW6ybDngG4Eg8sMMXPaMHSc=
 github.com/DisgoOrg/dislog v1.0.5/go.mod h1:Ai7d+00tpduC/T1T+fHBRvGDU9ApUUQnKDlLK/qbQtI=
 github.com/DisgoOrg/log v1.1.2 h1:tGJS4jaH1PyjPRHybHp8WpYJ/4fR3fYWT4Mv1PoDGBM=

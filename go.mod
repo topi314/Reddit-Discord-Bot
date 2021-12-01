@@ -3,7 +3,7 @@ module github.com/TopiSenpai/Reddit-Discord-Bot
 go 1.16
 
 require (
-	github.com/DisgoOrg/disgo v0.6.3
+	github.com/DisgoOrg/disgo v0.6.5
 	github.com/DisgoOrg/dislog v1.0.5
 	github.com/sirupsen/logrus v1.8.1
 	github.com/vartanbeno/go-reddit/v2 v2.0.1
