@@ -67,18 +67,22 @@ func listenToSubreddit(subreddit string, quit chan struct{}) {
 
 		case post := <-posts:
 			description := post.Body
-			if len(description) > 2048 {
-				description = string([]rune(description)[0:2045]) + "..."
+			if len(description) > 4096 {
+				description = string([]rune(description)[0:4093]) + "..."
 			}
 
 			url := post.URL
 			if !imageRegex.MatchString(url) {
 				url = ""
 			}
+			title := post.Title
+			if len(title) > 256 {
+				title = string([]rune(title)[0:253]) + "..."
+			}
 
 			webhookMessageCreate := discord.WebhookMessageCreate{
 				Embeds: []discord.Embed{discord.NewEmbedBuilder().
-					SetTitle(post.Title).
+					SetTitle(title).
 					SetURL("https://www.reddit.com"+post.Permalink).
 					SetColor(0xff581a).
 					SetAuthorName("New post on "+post.SubredditNamePrefixed).
@@ -86,7 +90,8 @@ func listenToSubreddit(subreddit string, quit chan struct{}) {
 					SetDescription(description).
 					SetImage(url).
 					AddField("Author", post.Author, false).
-					Build()},
+					Build(),
+				},
 			}
 
 			for _, webhookClient := range subreddits[subreddit] {
