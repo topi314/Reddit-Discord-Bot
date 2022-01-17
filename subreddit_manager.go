@@ -98,7 +98,7 @@ func listenToSubreddit(subreddit string, quit chan struct{}) {
 				_, err := webhookClient.CreateMessage(webhookMessageCreate)
 				if err != nil {
 					if e, ok := err.(*rest.Error); ok {
-						if e.Code == http.StatusNotFound {
+						if e.Response != nil && e.Response.StatusCode == http.StatusNotFound {
 							logger.Warnf("webhook `%s` not found, removing it", webhookClient.ID)
 							unsubscribeFromSubreddit(subreddit, webhookClient.ID, true)
 							continue

@@ -10,7 +10,7 @@ import (
 )
 
 type WebhookCreateState struct {
-	Interaction *core.SlashCommandInteraction
+	Interaction *core.ApplicationCommandInteraction
 	Subreddit   string
 }
 
@@ -76,7 +76,7 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 		message.SetContent("Successfully added webhook. Everything is ready to go")
 	}
 
-	_, err = webhookState.Interaction.CreateFollowup(message.Build())
+	_, err = webhookState.Interaction.CreateFollowupMessage(message.Build())
 	if err != nil {
 		logger.Errorf("error while sending followup: %s", err)
 		writeError(w)

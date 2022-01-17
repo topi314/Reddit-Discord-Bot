@@ -47,6 +47,7 @@ var (
 
 func main() {
 	logger.SetLevel(loglevel)
+	logger.SetReportCaller(true)
 
 	if logWebhookID != "" && logWebhookToken != "" {
 		dlog, err := dislog.New(
@@ -86,7 +87,7 @@ func main() {
 			httpserver.WithServeMux(serveMux),
 		),
 		bot.WithEventListeners(&events.ListenerAdapter{
-			OnSlashCommand: onSlashCommand,
+			OnApplicationCommandInteraction: onSlashCommand,
 		}),
 	)
 	if err != nil {

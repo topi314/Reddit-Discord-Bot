@@ -7,12 +7,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/DisgoOrg/disgo/core"
 	"github.com/DisgoOrg/disgo/core/events"
 	"github.com/DisgoOrg/disgo/discord"
 )
 
 var subredditNamePattern = regexp.MustCompile(`\A[A-Za-z0-9][A-Za-z0-9_]{2,20}`)
-
 
 var commands = []discord.ApplicationCommandCreate{
 	discord.SlashCommandCreate{
@@ -50,22 +50,23 @@ var commands = []discord.ApplicationCommandCreate{
 	},
 }
 
-func onSlashCommand(event *events.SlashCommandEvent) {
+func onSlashCommand(event *events.ApplicationCommandInteractionEvent) {
+	data := event.SlashCommandInteractionData()
 	var err error
-	if event.Data.CommandName == "subreddit" {
-		if event.InteractionFields.Member.InteractionPermissions().Missing(discord.PermissionManageServer) {
+	if data.CommandName == "subreddit" {
+		if event.Member.InteractionPermissions().Missing(discord.PermissionManageServer) {
 			err = event.Create(discord.MessageCreate{
 				Content: "You don't have permission to manage this server",
 				Flags:   discord.MessageFlagEphemeral,
 			})
 			return
 		}
-		switch *event.Data.SubCommandName {
+		switch *data.SubCommandName {
 		case "add":
-			err = onSubredditAdd(event)
+			err = onSubredditAdd(data, event)
 
 		case "remove":
-			err = onSubredditRemove(event)
+			err = onSubredditRemove(data, event)
 
 		case "list":
 			err = onSubredditList(event)
@@ -76,8 +77,8 @@ func onSlashCommand(event *events.SlashCommandEvent) {
 	}
 }
 
-func onSubredditAdd(event *events.SlashCommandEvent) error {
-	name := *event.Data.Options.String("subreddit")
+func onSubredditAdd(data *core.SlashCommandInteractionData, event *events.ApplicationCommandInteractionEvent) error {
+	name := *data.Options.String("subreddit")
 	if !subredditNamePattern.MatchString(name) {
 		return event.Create(discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
@@ -109,7 +110,7 @@ func onSubredditAdd(event *events.SlashCommandEvent) error {
 	url, state := oauth2Client.GenerateAuthorizationURLState(baseURL+CreateCallbackURL, 0, *event.GuildID, false, discord.ApplicationScopeWebhookIncoming)
 
 	webhookCreateStates[state] = WebhookCreateState{
-		Interaction: event.SlashCommandInteraction,
+		Interaction: event.ApplicationCommandInteraction,
 		Subreddit:   subreddit,
 	}
 
@@ -120,8 +121,8 @@ func onSubredditAdd(event *events.SlashCommandEvent) error {
 	)
 }
 
-func onSubredditRemove(event *events.SlashCommandEvent) error {
-	subreddit := strings.ToLower(*event.Data.Options.String("subreddit"))
+func onSubredditRemove(data *core.SlashCommandInteractionData, event *events.ApplicationCommandInteractionEvent) error {
+	subreddit := strings.ToLower(*data.Options.String("subreddit"))
 
 	var subredditSubscription *SubredditSubscription
 	if err := database.Where("subreddit = ? AND guild_id = ?", subreddit, event.GuildID).First(&subredditSubscription).Error; err != nil {
@@ -139,7 +140,7 @@ func onSubredditRemove(event *events.SlashCommandEvent) error {
 	)
 }
 
-func onSubredditList(event *events.SlashCommandEvent) error {
+func onSubredditList(event *events.ApplicationCommandInteractionEvent) error {
 	var subredditSubscriptions []*SubredditSubscription
 	db := database.Where("guild_id = ?", event.GuildID).Find(&subredditSubscriptions)
 	var message string
