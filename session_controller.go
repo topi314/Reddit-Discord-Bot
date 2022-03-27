@@ -3,8 +3,8 @@ package main
 import (
 	"time"
 
-	"github.com/DisgoOrg/disgo/discord"
-	"github.com/DisgoOrg/disgo/oauth2"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/oauth2"
 )
 
 var _ oauth2.SessionController = (*CustomSessionController)(nil)

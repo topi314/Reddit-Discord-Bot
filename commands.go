@@ -7,16 +7,15 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/DisgoOrg/disgo/core"
-	"github.com/DisgoOrg/disgo/core/events"
-	"github.com/DisgoOrg/disgo/discord"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/events"
 )
 
-var subredditNamePattern = regexp.MustCompile(`\A[A-Za-z0-9][A-Za-z0-9_]{2,20}`)
+var subredditNamePattern = regexp.MustCompile(`\A(r/)?(?P<name>[A-Za-z\d]\w{2,20})$`)
 
 var commands = []discord.ApplicationCommandCreate{
 	discord.SlashCommandCreate{
-		Name:        "subreddit",
+		CommandName: "subreddit",
 		Description: "lets you manage all your subreddits",
 		Options: []discord.ApplicationCommandOption{
 			discord.ApplicationCommandOptionSubCommand{
@@ -50,12 +49,12 @@ var commands = []discord.ApplicationCommandCreate{
 	},
 }
 
-func onSlashCommand(event *events.ApplicationCommandInteractionEvent) {
+func (b *RedditBot) onApplicationCommandInteraction(event *events.ApplicationCommandInteractionEvent) {
 	data := event.SlashCommandInteractionData()
 	var err error
-	if data.CommandName == "subreddit" {
-		if event.Member.InteractionPermissions().Missing(discord.PermissionManageServer) {
-			err = event.Create(discord.MessageCreate{
+	if data.CommandName() == "subreddit" {
+		if event.Member().Permissions.Missing(discord.PermissionManageServer) {
+			err = event.CreateMessage(discord.MessageCreate{
 				Content: "You don't have permission to manage this server",
 				Flags:   discord.MessageFlagEphemeral,
 			})
@@ -63,96 +62,113 @@ func onSlashCommand(event *events.ApplicationCommandInteractionEvent) {
 		}
 		switch *data.SubCommandName {
 		case "add":
-			err = onSubredditAdd(data, event)
+			err = b.onSubredditAdd(event, data)
 
 		case "remove":
-			err = onSubredditRemove(data, event)
+			err = b.onSubredditRemove(event, data)
 
 		case "list":
-			err = onSubredditList(event)
+			err = b.onSubredditList(event)
 		}
 	}
 	if err != nil {
-		logger.Error("error while processing command: ", err)
+		b.Logger.Error("error while processing command: ", err)
 	}
 }
 
-func onSubredditAdd(data *core.SlashCommandInteractionData, event *events.ApplicationCommandInteractionEvent) error {
-	name := *data.Options.String("subreddit")
-	if !subredditNamePattern.MatchString(name) {
-		return event.Create(discord.NewMessageCreateBuilder().
+func parseSubredditName(name string) (string, bool) {
+	match := subredditNamePattern.FindStringSubmatch(name)
+	if len(match) == 0 {
+		return "", false
+	}
+	return strings.ToLower(match[subredditNamePattern.SubexpIndex("name")]), true
+}
+
+func (b *RedditBot) onSubredditAdd(event *events.ApplicationCommandInteractionEvent, data discord.SlashCommandInteractionData) error {
+	subreddit, ok := parseSubredditName(data.String("subreddit"))
+	if !ok {
+		return event.CreateMessage(discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
-			SetContentf("`%s` is not a valid subreddit name. paste just the name.", name).
+			SetContentf("`%s` is not a valid subreddit name.", data.String("subreddit")).
 			Build(),
 		)
 	}
-	subreddit := strings.ToLower(name)
 
-	if _, resp, err := redditClient.Subreddit.Get(context.Background(), subreddit); err != nil {
+	if _, resp, err := b.RedditClient.Subreddit.Get(context.Background(), subreddit); err != nil {
 		return err
 	} else if resp != nil && resp.Response.StatusCode == http.StatusNotFound {
-		return event.Create(discord.NewMessageCreateBuilder().
+		return event.CreateMessage(discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
-			SetContentf("could not find `r/%s`.", name).
+			SetContentf("could not find `r/%s`.", subreddit).
 			Build(),
 		)
 	}
 
-	var subredditSubscription *SubredditSubscription
-	if err := database.Where("subreddit = ? AND guild_id = ?", subreddit, event.GuildID).First(&subredditSubscription).Error; err == nil {
-		return event.Create(discord.NewMessageCreateBuilder().
+	var subscriptions *Subscription
+	if err := b.DB.NewSelect().Model(&subscriptions).Where("subreddit = ? AND guild_id = ?", subreddit, *event.GuildID()); err == nil {
+		return event.CreateMessage(discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
 			SetContentf("you already added `r/%s` to this server", subreddit).
 			Build(),
 		)
 	}
 
-	url, state := oauth2Client.GenerateAuthorizationURLState(baseURL+CreateCallbackURL, 0, *event.GuildID, false, discord.ApplicationScopeWebhookIncoming)
+	url, state := b.OAuth2Client.GenerateAuthorizationURLState(baseURL+CreateCallbackURL, 0, *event.GuildID(), false, discord.ApplicationScopeWebhookIncoming)
 
 	webhookCreateStates[state] = WebhookCreateState{
 		Interaction: event.ApplicationCommandInteraction,
 		Subreddit:   subreddit,
 	}
 
-	return event.Create(discord.NewMessageCreateBuilder().
+	return event.CreateMessage(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
-		SetContentf("click [here](%s) to add a new webhook", url).
+		SetContentf("click [here](%s) to add a new webhook for the subreddit", url).
 		Build(),
 	)
 }
 
-func onSubredditRemove(data *core.SlashCommandInteractionData, event *events.ApplicationCommandInteractionEvent) error {
-	subreddit := strings.ToLower(*data.Options.String("subreddit"))
-
-	var subredditSubscription *SubredditSubscription
-	if err := database.Where("subreddit = ? AND guild_id = ?", subreddit, event.GuildID).First(&subredditSubscription).Error; err != nil {
-		return event.Create(discord.NewMessageCreateBuilder().
+func (b *RedditBot) onSubredditRemove(event *events.ApplicationCommandInteractionEvent, data discord.SlashCommandInteractionData) error {
+	subreddit, ok := parseSubredditName(data.String("subreddit"))
+	if !ok {
+		return event.CreateMessage(discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
-			SetContentf("could not find r/%s linked to any channel", subreddit).
+			SetContentf("`%s` is not a valid subreddit name.", data.String("subreddit")).
 			Build(),
 		)
 	}
-	unsubscribeFromSubreddit(subreddit, subredditSubscription.WebhookID, true)
-	return event.Create(discord.NewMessageCreateBuilder().
+
+	var subscriptions *Subscription
+	if err := b.DB.NewSelect().Model(&subscriptions).Where("subreddit = ? AND guild_id = ?", subreddit, *event.GuildID()); err != nil {
+		return event.CreateMessage(discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContentf("could not find `r/%s` linked to any channels", subreddit).
+			Build(),
+		)
+	}
+	b.unsubscribeFromSubreddit(subreddit, subscriptions.WebhookID, true)
+	return event.CreateMessage(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
-		SetContentf("removed r/%s", subreddit).
+		SetContentf("removed `r/%s`", subreddit).
 		Build(),
 	)
 }
 
-func onSubredditList(event *events.ApplicationCommandInteractionEvent) error {
-	var subredditSubscriptions []*SubredditSubscription
-	db := database.Where("guild_id = ?", event.GuildID).Find(&subredditSubscriptions)
+func (b *RedditBot) onSubredditList(event *events.ApplicationCommandInteractionEvent) error {
+	var subscriptions []*Subscription
 	var message string
-	if db.Error != nil {
-		message = "no linked subreddits found"
+	if err := b.DB.NewSelect().Model(&subscriptions).Where("guild_id = ?", *event.GuildID()); err != nil {
+		message = "There was an error retrieving your subreddits"
 	} else {
-		message = "Following subreddits are linked:\n"
-		for _, subredditSubscription := range subredditSubscriptions {
-			message += fmt.Sprintf("• r/%s in <#%s>\n", subredditSubscription.Subreddit, subredditSubscription.ChannelID)
+		if len(b.Subreddits) == 0 {
+			message = "no linked subreddits found"
+		} else {
+			message = "Following subreddits are linked:\n"
+			for _, subscription := range subscriptions {
+				message += fmt.Sprintf("• `r/%s` in <#%s>\n", subscription.Subreddit, subscription.ChannelID)
+			}
 		}
 	}
-	return event.Create(discord.NewMessageCreateBuilder().
+	return event.CreateMessage(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
 		SetContentf(message).
 		Build(),

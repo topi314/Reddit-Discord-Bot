@@ -1,20 +1,17 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"os/signal"
 	"regexp"
 	"syscall"
+	"time"
 
-	"github.com/DisgoOrg/disgo/core"
-	"github.com/DisgoOrg/disgo/core/bot"
-	"github.com/DisgoOrg/disgo/core/events"
-	"github.com/DisgoOrg/disgo/discord"
-	"github.com/DisgoOrg/disgo/httpserver"
-	"github.com/DisgoOrg/disgo/oauth2"
-	"github.com/DisgoOrg/disgo/rest"
-	"github.com/DisgoOrg/dislog"
+	"github.com/disgoorg/disgo/webhook"
+	"github.com/disgoorg/dislog"
+	"github.com/disgoorg/snowflake"
 	"github.com/sirupsen/logrus"
 	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
@@ -26,31 +23,30 @@ const (
 )
 
 var (
-	token = os.Getenv("token")
+	token                = os.Getenv("token")
+	logWebhookID         = snowflake.GetSnowflakeEnv("log_webhook_id")
+	logWebhookToken      = os.Getenv("log_webhook_token")
+	publicKey            = os.Getenv("public_key")
+	secret               = os.Getenv("secret")
+	baseURL              = os.Getenv("base_url")
+	webhookServerAddress = os.Getenv("webhook_server_address")
+	loglevel, _          = logrus.ParseLevel(os.Getenv("log_level"))
 
-	logWebhookID      = discord.Snowflake(os.Getenv("log_webhook_id"))
-	logWebhookToken   = os.Getenv("log_webhook_token")
-	publicKey         = os.Getenv("public_key")
-	secret            = os.Getenv("secret")
-	baseURL           = os.Getenv("base_url")
-	webhookServerPort = os.Getenv("webhook_server_port")
-	loglevel, _       = logrus.ParseLevel(os.Getenv("log_level"))
-
-	logger       = logrus.New()
-	httpClient   = http.DefaultClient
-	disgo        *core.Bot
-	oauth2Client *oauth2.Client
-	redditClient *reddit.Client
+	redditID       = os.Getenv("reddit_id")
+	redditSecret   = os.Getenv("reddit_secret")
+	redditUsername = os.Getenv("reddit_username")
+	redditPassword = os.Getenv("reddit_password")
 
 	imageRegex = regexp.MustCompile(`.*\.(?:jpg|gif|png)`)
 )
 
 func main() {
+	logger := logrus.New()
 	logger.SetLevel(loglevel)
 	logger.SetReportCaller(true)
 
 	if logWebhookID != "" && logWebhookToken != "" {
-		dlog, err := dislog.New(
+		hook, err := dislog.New(
 			dislog.WithWebhookIDToken(logWebhookID, logWebhookToken),
 			dislog.WithLogLevels(dislog.InfoLevelAndAbove...),
 		)
@@ -58,67 +54,53 @@ func main() {
 			logger.Errorf("error initializing dislog %s", err)
 			return
 		}
-		defer dlog.Close()
+		defer hook.Close(context.TODO())
 
-		logger.AddHook(dlog)
+		logger.AddHook(hook)
 	}
 
 	logger.Infof("starting Reddit-Discord-Bot...")
-
-	serveMux := http.NewServeMux()
-	serveMux.HandleFunc(CreateCallbackURL, webhookCreateHandler)
-	serveMux.HandleFunc(SuccessURL, webhookCreateSuccessHandler)
+	redditBot := &RedditBot{
+		Logger:               logger,
+		HTTPClient:           &http.Client{Timeout: 10 * time.Second},
+		Subreddits:           map[string][]webhook.Client{},
+		SubredditCancelFuncs: map[string]func(){},
+	}
 
 	var err error
-	disgo, err = bot.New(token,
-		bot.WithRestClientOpts(
-			rest.WithHTTPClient(httpClient),
-		),
-		bot.WithLogger(logger),
-		bot.WithCacheOpts(
-			core.WithCacheFlags(core.CacheFlagsNone),
-			core.WithMemberCachePolicy(core.MemberCachePolicyNone),
-			core.WithMessageCachePolicy(core.MessageCachePolicyNone),
-		),
-		bot.WithHTTPServerOpts(
-			httpserver.WithPort(webhookServerPort),
-			httpserver.WithURL(InteractionCallbackURL),
-			httpserver.WithPublicKey(publicKey),
-			httpserver.WithServeMux(serveMux),
-		),
-		bot.WithEventListeners(&events.ListenerAdapter{
-			OnApplicationCommandInteraction: onSlashCommand,
-		}),
-	)
-	if err != nil {
-		logger.Fatal("error while building disgo instance: ", err)
-		return
+	if err = redditBot.Setup(); err != nil {
+		logger.Fatal("error setting up bot:", err)
 	}
 
-	if _, err = disgo.SetCommands(commands); err != nil {
-		logger.Error("error while setting commands: ", err)
+	if err = redditBot.SetupCommands(); err != nil {
+		logger.Error("error setting up bot:", err)
 	}
 
-	oauth2Client = oauth2.New(disgo.ApplicationID, secret,
-		oauth2.WithRestClientConfigOpts(
-			rest.WithHTTPClient(httpClient),
-		),
-		oauth2.WithSessionController(&CustomSessionController{}),
-	)
+	redditBot.SetupOAuth2()
 
-	if err = disgo.StartHTTPServer(); err != nil {
+	if err = redditBot.Start(); err != nil {
 		logger.Fatal("error while starting http server: ", err)
 		return
 	}
 
-	redditClient, err = reddit.NewReadonlyClient()
-	if err != nil {
-		logger.Panic("failed to init reddit client")
+	if redditBot.RedditClient, err = reddit.NewClient(reddit.Credentials{
+		ID:       redditID,
+		Secret:   redditSecret,
+		Username: redditUsername,
+		Password: redditPassword,
+	}); err != nil {
+		logger.Fatal("failed to init reddit client: ", err)
 		return
 	}
 
-	connectToDatabase()
-	loadAllSubreddits()
+	if err = redditBot.SetupDB(); err != nil {
+		logger.Fatal("failed to setup database: ", err)
+		return
+	}
+	if err = redditBot.loadAllSubreddits(); err != nil {
+		logger.Fatal("failed to load subscriptions: ", err)
+		return
+	}
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)

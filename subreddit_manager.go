@@ -1,68 +1,69 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"time"
 
-	"github.com/DisgoOrg/disgo/discord"
-	"github.com/DisgoOrg/disgo/rest"
-	"github.com/DisgoOrg/disgo/webhook"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
+	"github.com/disgoorg/disgo/webhook"
+	"github.com/disgoorg/snowflake"
 	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
 
-var subreddits = map[string][]*webhook.Client{}
-var subredditChannels = map[string]chan struct{}{}
-
-func subscribeToSubreddit(subreddit string, webhookClient *webhook.Client) {
-	logger.Debugf("subscribing to r/%s", subreddit)
-	_, ok := subreddits[subreddit]
+func (b *RedditBot) subscribeToSubreddit(subreddit string, webhookClient webhook.Client) {
+	b.Logger.Debugf("subscribing to r/%s", subreddit)
+	_, ok := b.Subreddits[subreddit]
 	if !ok {
-		subreddits[subreddit] = []*webhook.Client{}
+		b.Subreddits[subreddit] = []webhook.Client{}
 	}
-	subreddits[subreddit] = append(subreddits[subreddit], webhookClient)
+	b.Subreddits[subreddit] = append(b.Subreddits[subreddit], webhookClient)
 
-	_, ok = subredditChannels[subreddit]
+	_, ok = b.SubredditCancelFuncs[subreddit]
 	if !ok {
-		quit := make(chan struct{})
-		subredditChannels[subreddit] = quit
-		go listenToSubreddit(subreddit, quit)
+		ctx, cancel := context.WithCancel(context.Background())
+		b.SubredditCancelFuncs[subreddit] = cancel
+		go b.listenToSubreddit(subreddit, ctx)
 	}
 }
 
-func unsubscribeFromSubreddit(subreddit string, webhookID discord.Snowflake, deleteWebhook bool) {
-	logger.Debugf("unsubcribing from r/%s", subreddit)
-	_, ok := subreddits[subreddit]
+func (b *RedditBot) unsubscribeFromSubreddit(subreddit string, webhookID snowflake.Snowflake, deleteWebhook bool) {
+	b.Logger.Debugf("unsubscribing from r/%s", subreddit)
+	_, ok := b.Subreddits[subreddit]
 	if !ok {
 		return
 	}
-	for i, wc := range subreddits[subreddit] {
-		if wc.ID == webhookID {
-			subreddits[subreddit] = append(subreddits[subreddit][:i], subreddits[subreddit][i+1:]...)
+	for i, wc := range b.Subreddits[subreddit] {
+		if wc.ID() == webhookID {
+			b.Subreddits[subreddit] = append(b.Subreddits[subreddit][:i], b.Subreddits[subreddit][i+1:]...)
 			if deleteWebhook {
 				err := wc.DeleteWebhook()
 				if err != nil {
-					logger.Errorf("error while deleting wehook: %s", err)
+					b.Logger.Error("error while deleting webhook: ", err)
 				}
 			}
-			database.Delete(&SubredditSubscription{}, "webhook_id = ?", webhookID)
-			if len(subreddits[subreddit]) == 0 {
-				delete(subreddits, subreddit)
-				subredditChannels[subreddit] <- struct{}{}
+			if _, err := b.DB.NewDelete().Model((*Subscription)(nil)).Where("webhook_id = ?", webhookID).Exec(context.TODO()); err != nil {
+				b.Logger.Error("error while deleting subscription: ", err)
+			}
+			if len(b.Subreddits[subreddit]) == 0 {
+				delete(b.Subreddits, subreddit)
+				b.SubredditCancelFuncs[subreddit]()
 			}
 			return
 		}
 	}
-	logger.Warnf("could not find webhook `%s` to remove", webhookID)
+	b.Logger.Warnf("could not find webhook `%s` to remove", webhookID)
 }
 
-func listenToSubreddit(subreddit string, quit chan struct{}) {
-	logger.Debugf("listening to r/%s", subreddit)
-	posts, errs, closer := redditClient.Stream.Posts(subreddit, reddit.StreamInterval(time.Minute*2), reddit.StreamDiscardInitial)
+func (b *RedditBot) listenToSubreddit(subreddit string, ctx context.Context) {
+	b.Logger.Debugf("listening to r/%s", subreddit)
+	posts, errs, closer := b.RedditClient.Stream.Posts(subreddit, reddit.StreamInterval(time.Second*30), reddit.StreamDiscardInitial)
 	for {
 		select {
-		case <-quit:
+		case <-ctx.Done():
 			closer()
-			logger.Debugf("stop listening to r/%s", subreddit)
+			b.Logger.Debugf("stop listening to r/%s", subreddit)
 			return
 
 		case post := <-posts:
@@ -94,39 +95,39 @@ func listenToSubreddit(subreddit string, quit chan struct{}) {
 				},
 			}
 
-			for _, webhookClient := range subreddits[subreddit] {
+			for _, webhookClient := range b.Subreddits[subreddit] {
 				_, err := webhookClient.CreateMessage(webhookMessageCreate)
-				if err != nil {
-					if e, ok := err.(*rest.Error); ok {
-						if e.Response != nil && e.Response.StatusCode == http.StatusNotFound {
-							logger.Warnf("webhook `%s` not found, removing it", webhookClient.ID)
-							unsubscribeFromSubreddit(subreddit, webhookClient.ID, true)
-							continue
-						}
-						if e.RsBody != nil {
-							logger.Errorf("error while sending post to webhook: %s, body: %s", err, string(e.RsBody))
-							continue
-						}
+				if e, ok := err.(*rest.Error); ok {
+					if e.Response.StatusCode == http.StatusNotFound {
+						b.Logger.Warnf("webhook `%s` not found, removing it", webhookClient.ID)
+						b.unsubscribeFromSubreddit(subreddit, webhookClient.ID(), true)
+						continue
 					}
-					logger.Errorf("error while sending post to webhook: %s", err)
+					b.Logger.Errorf("error while sending post to webhook: %s, body: %s", err, string(e.RsBody))
+				} else if err != nil {
+					b.Logger.Error("error while sending post to webhook: ", err)
+				} else {
+					b.Logger.Debugf("sent post to webhook `%s`", webhookClient.ID())
 				}
-
 			}
 
 		case err := <-errs:
-			logger.Errorf("received error from reddit post stream: %s", err)
+			b.Logger.Error("received error from reddit post stream: ", err)
 		}
 	}
 }
 
-func loadAllSubreddits() {
-	var subredditSubscriptions []*SubredditSubscription
-	_ = database.Find(&subredditSubscriptions)
-	for _, subredditSubscription := range subredditSubscriptions {
-		webhookClient := webhook.NewClient(subredditSubscription.WebhookID, subredditSubscription.WebhookToken,
-			webhook.WithRestClientConfigOpts(rest.WithHTTPClient(httpClient)),
-			webhook.WithLogger(logger),
-		)
-		subscribeToSubreddit(subredditSubscription.Subreddit, webhookClient)
+func (b *RedditBot) loadAllSubreddits() error {
+	var subscriptions []Subscription
+	if err := b.DB.NewSelect().Model(&subscriptions).Scan(context.TODO()); err != nil {
+		return err
 	}
+	for _, subscription := range subscriptions {
+		webhookClient := webhook.NewClient(subscription.WebhookID, subscription.WebhookToken,
+			webhook.WithRestClientConfigOpts(rest.WithHTTPClient(b.HTTPClient)),
+			webhook.WithLogger(b.Logger),
+		)
+		b.subscribeToSubreddit(subscription.Subreddit, webhookClient)
+	}
+	return nil
 }

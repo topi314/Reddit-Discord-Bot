@@ -1,22 +1,22 @@
 package main
 
 import (
+	"context"
 	"net/http"
 
-	"github.com/DisgoOrg/disgo/core"
-	"github.com/DisgoOrg/disgo/discord"
-	"github.com/DisgoOrg/disgo/rest"
-	"github.com/DisgoOrg/disgo/webhook"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
+	"github.com/disgoorg/disgo/webhook"
 )
 
 type WebhookCreateState struct {
-	Interaction *core.ApplicationCommandInteraction
+	Interaction discord.ApplicationCommandInteraction
 	Subreddit   string
 }
 
 var webhookCreateStates = map[string]WebhookCreateState{}
 
-func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
+func (b *RedditBot) webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	code := query.Get("code")
 	state := query.Get("state")
@@ -33,36 +33,39 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	delete(webhookCreateStates, state)
 
-	session, err := oauth2Client.StartSession(code, state, "")
+	session, err := b.OAuth2Client.StartSession(code, state, "")
 	if err != nil {
-		logger.Errorf("error while exchanging code: %s", err)
+		b.Logger.Errorf("error while exchanging code: %s", err)
 		writeError(w)
 		return
 	}
 
 	webhookClient := webhook.NewClient(session.Webhook().ID(), session.Webhook().Token,
 		webhook.WithRestClientConfigOpts(
-			rest.WithHTTPClient(httpClient),
+			rest.WithHTTPClient(b.HTTPClient),
 		),
-		webhook.WithLogger(logger),
+		webhook.WithLogger(b.Logger),
 	)
 	if err != nil {
-		logger.Errorf("error creating webhook client: %s", err)
+		b.Logger.Errorf("error creating webhook client: %s", err)
 		writeError(w)
 		return
 	}
 
 	go func() {
-		database.Create(&SubredditSubscription{
+		if _, err = b.DB.NewInsert().Model(&Subscription{
 			Subreddit:    webhookState.Subreddit,
 			GuildID:      session.Webhook().GuildID,
 			ChannelID:    session.Webhook().ChannelID,
 			WebhookID:    session.Webhook().ID(),
 			WebhookToken: session.Webhook().Token,
-		})
+		}).Exec(context.TODO()); err != nil {
+			b.Logger.Errorf("error inserting subscription: %s", err)
+			return
+		}
 	}()
 
-	subscribeToSubreddit(webhookState.Subreddit, webhookClient)
+	b.subscribeToSubreddit(webhookState.Subreddit, webhookClient)
 
 	_, err = webhookClient.CreateMessage(discord.NewWebhookMessageCreateBuilder().
 		SetContent("Webhook for [r/" + webhookState.Subreddit + "](https://www.reddit.com/r/" + webhookState.Subreddit + ") successfully created").
@@ -70,15 +73,14 @@ func webhookCreateHandler(w http.ResponseWriter, r *http.Request) {
 	)
 	message := discord.NewMessageCreateBuilder().SetEphemeral(true)
 	if err != nil {
-		logger.Errorf("error while tesing webhook: %s", err)
+		b.Logger.Errorf("error while tesing webhook: %s", err)
 		message.SetContent("There was a problem setting up your webhook.\nRetry or reach out for help [here](https://discord.gg/sD3ABd5)")
 	} else {
 		message.SetContent("Successfully added webhook. Everything is ready to go")
 	}
 
-	_, err = webhookState.Interaction.CreateFollowupMessage(message.Build())
-	if err != nil {
-		logger.Errorf("error while sending followup: %s", err)
+	if _, err = b.Client.Rest().Interactions().CreateFollowupMessage(webhookState.Interaction.ApplicationID(), webhookState.Interaction.Token(), message.Build()); err != nil {
+		b.Logger.Errorf("error while sending followup: %s", err)
 		writeError(w)
 		return
 	}

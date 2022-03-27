@@ -1,49 +1,50 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"database/sql"
 	"os"
-	"time"
+	"strconv"
 
-	"github.com/DisgoOrg/disgo/discord"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	"github.com/disgoorg/snowflake"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
+	"github.com/uptrace/bun/extra/bundebug"
 )
 
-var dbUser = os.Getenv("db_user")
-var dbPassword = os.Getenv("db_password")
-var dbHost = os.Getenv("db_host")
-var dbPort = os.Getenv("db_port")
-var dbName = os.Getenv("db_name")
+var (
+	devMode, _            = strconv.ParseBool(os.Getenv("dev_mode"))
+	shouldSyncDBTables, _ = strconv.ParseBool(os.Getenv("should_sync_db"))
 
-var database *gorm.DB
+	dbUser     = os.Getenv("db_user")
+	dbPassword = os.Getenv("db_password")
+	dbAddress  = os.Getenv("db_address")
+	dbName     = os.Getenv("db_name")
+)
 
-type SubredditSubscription struct {
-	ID           uint              `gorm:"primarykey"`
-	Subreddit    string            `gorm:"uniqueIndex:Subreddit_ChannelID"`
-	GuildID      discord.Snowflake `gorm:"uniqueIndex:Subreddit_ChannelID"`
-	ChannelID    discord.Snowflake
-	WebhookID    discord.Snowflake
-	WebhookToken string
+func (b *RedditBot) SetupDB() error {
+	sqlDB := sql.OpenDB(pgdriver.NewConnector(
+		pgdriver.WithAddr(dbAddress),
+		pgdriver.WithUser(dbUser),
+		pgdriver.WithPassword(dbPassword),
+		pgdriver.WithDatabase(dbName),
+		pgdriver.WithInsecure(true),
+	))
+	b.DB = bun.NewDB(sqlDB, pgdialect.New())
+	b.DB.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(devMode)))
+	if shouldSyncDBTables {
+		if err := b.DB.ResetModel(context.TODO(), (*Subscription)(nil)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func connectToDatabase() {
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Europe/Berlin", dbHost, dbUser, dbPassword, dbName, dbPort)
-	var err error
-	database, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		logger.Fatalf("error while connecting to db: %s", err)
-	}
-	db, err := database.DB()
-	if err != nil {
-		logger.Fatalf("error getting db: %s", err)
-	}
-	db.SetMaxIdleConns(1)
-	db.SetMaxOpenConns(10)
-	db.SetConnMaxLifetime(time.Minute * 10)
-
-	err = database.AutoMigrate(&SubredditSubscription{})
-	if err != nil {
-		logger.Fatalf("failed to auto-migrate db: %s", err)
-	}
+type Subscription struct {
+	Subreddit    string              `bun:"subreddit,pk"`
+	GuildID      snowflake.Snowflake `bun:"guild_id,pk"`
+	ChannelID    snowflake.Snowflake `bun:"channel_id,pk"`
+	WebhookID    snowflake.Snowflake `bun:"webhook_id"`
+	WebhookToken string              `bun:"webhook_token,"`
 }
