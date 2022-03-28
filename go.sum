@@ -2,8 +2,8 @@ cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/disgoorg/disgo v0.8.3 h1:EMkPGlpokGF+ob4pn6kDgACgSOlOfciAvbDBK04Wywk=
-github.com/disgoorg/disgo v0.8.3/go.mod h1:F5Qj4yeX3auG0JiEY3pP5nRSUjBsbuhITTAslNsIOvA=
+github.com/disgoorg/disgo v0.8.5 h1:jdlKdejd91CeuZszQczhMH77CI6x3zC82gsxPjAmyh8=
+github.com/disgoorg/disgo v0.8.5/go.mod h1:F5Qj4yeX3auG0JiEY3pP5nRSUjBsbuhITTAslNsIOvA=
 github.com/disgoorg/dislog v1.0.6-0.20220326151040-b9c67fa5c6ca h1:Kw04dkh92Yfv7yNn9aYbn1QWldBdDNwk0VOz8oRlWog=
 github.com/disgoorg/dislog v1.0.6-0.20220326151040-b9c67fa5c6ca/go.mod h1:6yRnFQfH1LXCwdEgz7BIhvhmCDXX5NJAkXWE64KkgSc=
 github.com/disgoorg/log v1.2.0 h1:sqlXnu/ZKAlIlHV9IO+dbMto7/hCQ474vlIdMWk8QKo=

@@ -3,7 +3,7 @@ module github.com/TopiSenpai/Reddit-Discord-Bot
 go 1.18
 
 require (
-	github.com/disgoorg/disgo v0.8.3
+	github.com/disgoorg/disgo v0.8.5
 	github.com/disgoorg/dislog v1.0.6-0.20220326151040-b9c67fa5c6ca
 	github.com/disgoorg/log v1.2.0
 	github.com/disgoorg/snowflake v1.1.0
