@@ -45,6 +45,6 @@ type Subscription struct {
 	Subreddit    string              `bun:"subreddit,pk"`
 	GuildID      snowflake.Snowflake `bun:"guild_id,pk"`
 	ChannelID    snowflake.Snowflake `bun:"channel_id,pk"`
-	WebhookID    snowflake.Snowflake `bun:"webhook_id"`
-	WebhookToken string              `bun:"webhook_token,"`
+	WebhookID    snowflake.Snowflake `bun:"webhook_id,notnull"`
+	WebhookToken string              `bun:"webhook_token,notnull"`
 }

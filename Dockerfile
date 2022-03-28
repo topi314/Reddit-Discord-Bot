@@ -1,4 +1,4 @@
-FROM golang:1.16.2-alpine AS build
+FROM golang:1.18-alpine AS build
 
 WORKDIR /tmp/app
 
@@ -11,9 +11,9 @@ RUN apk add --no-cache git && \
 
 FROM alpine:latest
 
-WORKDIR /home/reddit-discord-bot
+WORKDIR /app
 
-COPY --from=build /tmp/app/reddit-discord-bot /home/reddit-discord-bot/
+COPY --from=build /tmp/app/reddit-discord-bot /app/reddit-discord-bot
 
 EXPOSE 80
 
