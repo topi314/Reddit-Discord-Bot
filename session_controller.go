@@ -11,7 +11,9 @@ var _ oauth2.SessionController = (*CustomSessionController)(nil)
 
 type CustomSessionController struct{}
 
-func (c *CustomSessionController) GetSession(identifier string) oauth2.Session { panic("implement me") }
+func (c *CustomSessionController) GetSession(_ string) oauth2.Session {
+	return nil
+}
 
 func (c *CustomSessionController) CreateSession(_ string, _ string, _ string, _ []discord.ApplicationScope, _ discord.TokenType, _ time.Time, webhook *discord.IncomingWebhook) oauth2.Session {
 	return &Session{
