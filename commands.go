@@ -104,8 +104,8 @@ func (b *RedditBot) onSubredditAdd(event *events.ApplicationCommandInteractionEv
 		)
 	}
 
-	var subscriptions *Subscription
-	if err := b.DB.NewSelect().Model(&subscriptions).Where("subreddit = ? AND guild_id = ?", subreddit, *event.GuildID()); err == nil {
+	var subscription Subscription
+	if err := b.DB.NewSelect().Model(&subscription).Where("subreddit = ? AND guild_id = ?", subreddit, *event.GuildID()).Scan(context.TODO()); err == nil {
 		return event.CreateMessage(discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
 			SetContentf("you already added `r/%s` to this server", subreddit).
@@ -137,15 +137,16 @@ func (b *RedditBot) onSubredditRemove(event *events.ApplicationCommandInteractio
 		)
 	}
 
-	var subscriptions *Subscription
-	if err := b.DB.NewSelect().Model(&subscriptions).Where("subreddit = ? AND guild_id = ?", subreddit, *event.GuildID()); err != nil {
+	var subscription Subscription
+	if err := b.DB.NewSelect().Model(&subscription).Where("subreddit = ? AND guild_id = ?", subreddit, *event.GuildID()).Scan(context.TODO()); err != nil {
+		fmt.Printf("ERROR: %s", err)
 		return event.CreateMessage(discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
 			SetContentf("could not find `r/%s` linked to any channels", subreddit).
 			Build(),
 		)
 	}
-	b.unsubscribeFromSubreddit(subreddit, subscriptions.WebhookID, true)
+	b.unsubscribeFromSubreddit(subreddit, subscription.WebhookID, true)
 	return event.CreateMessage(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
 		SetContentf("removed `r/%s`", subreddit).
@@ -156,9 +157,11 @@ func (b *RedditBot) onSubredditRemove(event *events.ApplicationCommandInteractio
 func (b *RedditBot) onSubredditList(event *events.ApplicationCommandInteractionEvent) error {
 	var subscriptions []*Subscription
 	var message string
-	if err := b.DB.NewSelect().Model(&subscriptions).Where("guild_id = ?", *event.GuildID()); err != nil {
+	if err := b.DB.NewSelect().Model(&subscriptions).Where("guild_id = ?", *event.GuildID()).Scan(context.TODO()); err != nil {
 		message = "There was an error retrieving your subreddits"
 	} else {
+		b.SubredditsMu.Lock()
+		defer b.SubredditsMu.Unlock()
 		if len(b.Subreddits) == 0 {
 			message = "no linked subreddits found"
 		} else {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
@@ -24,6 +25,7 @@ type RedditBot struct {
 	DB           *bun.DB
 
 	Subreddits           map[string][]webhook.Client
+	SubredditsMu         sync.Mutex
 	SubredditCancelFuncs map[string]func()
 }
 
