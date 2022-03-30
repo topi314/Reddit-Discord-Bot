@@ -2,7 +2,7 @@
 
 Simple webhook based bot delivering Reddit posts into your Discord Server
 
-The bot does not require any permissions and can't do anything in your Discord. With that it's safe to add!
+The bot does not require any permissions and can't do anything in your Discord. With that it's safe to use!
 
 # Setup
 
@@ -28,7 +28,7 @@ To remove a subreddit subscriptions run
 /subreddit remove <subreddit-name>
 ```
 
-, remove the bot under `Server Settings > Integrations` or just remove the webhook under `Channel Settings`
+and remove the bot under `Server Settings > Integrations` or just delete the webhook under `Channel Settings > Integrations > Webhooks`
 
 ## List Subreddits
 
