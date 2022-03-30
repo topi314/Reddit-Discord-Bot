@@ -65,7 +65,5 @@ func (b *RedditBot) SetupCommands() error {
 }
 
 func (b *RedditBot) SetupOAuth2() {
-	b.OAuth2Client = oauth2.New(b.Client.ApplicationID(), secret,
-		oauth2.WithSessionController(&CustomSessionController{}),
-	)
+	b.OAuth2Client = oauth2.New(b.Client.ApplicationID(), secret, oauth2.WithSessionController(&CustomSessionController{}))
 }

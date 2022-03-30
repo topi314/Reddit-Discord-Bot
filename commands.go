@@ -146,7 +146,7 @@ func (b *RedditBot) onSubredditRemove(event *events.ApplicationCommandInteractio
 			Build(),
 		)
 	}
-	b.unsubscribeFromSubreddit(subreddit, subscription.WebhookID, true)
+	b.unsubscribeFromSubreddit(subreddit, subscription.WebhookID)
 	return event.CreateMessage(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
 		SetContentf("removed `r/%s`", subreddit).

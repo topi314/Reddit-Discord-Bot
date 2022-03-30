@@ -20,6 +20,8 @@ const (
 	InteractionCallbackURL = "/webhooks/interactions/callback"
 	CreateCallbackURL      = "/webhooks/create/callback"
 	SuccessURL             = "/success"
+
+	EmbedColor = 0xff581a
 )
 
 var (

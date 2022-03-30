@@ -12,8 +12,10 @@ import (
 	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
 
+const MaxRetries = 10
+
 func (b *RedditBot) subscribeToSubreddit(subreddit string, webhookClient webhook.Client) {
-	b.Logger.Debugf("subscribing to r/%s", subreddit)
+	b.Logger.Infof("subscribing to r/%s", subreddit)
 	b.SubredditsMu.Lock()
 	defer b.SubredditsMu.Unlock()
 	_, ok := b.Subreddits[subreddit]
@@ -30,115 +32,132 @@ func (b *RedditBot) subscribeToSubreddit(subreddit string, webhookClient webhook
 	}
 }
 
-func (b *RedditBot) unsubscribeFromSubreddit(subreddit string, webhookID snowflake.Snowflake, deleteWebhook bool) {
-	b.Logger.Debugf("unsubscribing from r/%s", subreddit)
+func (b *RedditBot) unsubscribeFromSubreddit(subreddit string, webhookID snowflake.Snowflake) {
+	b.Logger.Infof("unsubscribing from r/%s", subreddit)
 	b.SubredditsMu.Lock()
 	defer b.SubredditsMu.Unlock()
 	_, ok := b.Subreddits[subreddit]
 	if !ok {
 		return
 	}
-	for i, wc := range b.Subreddits[subreddit] {
-		if wc.ID() == webhookID {
+	for i, webhookClient := range b.Subreddits[subreddit] {
+		if webhookClient.ID() == webhookID {
 			b.Subreddits[subreddit] = append(b.Subreddits[subreddit][:i], b.Subreddits[subreddit][i+1:]...)
-			if deleteWebhook {
-				err := wc.DeleteWebhook()
-				if err != nil {
-					b.Logger.Error("error while deleting webhook: ", err)
-				}
+			err := webhookClient.DeleteWebhook()
+			if err != nil {
+				b.Logger.Error("error while deleting webhook: ", err)
 			}
-			if _, err := b.DB.NewDelete().Model((*Subscription)(nil)).Where("webhook_id = ?", webhookID).Exec(context.TODO()); err != nil {
+
+			if _, err = b.DB.NewDelete().Model((*Subscription)(nil)).Where("webhook_id = ?", webhookID).Exec(context.TODO()); err != nil {
 				b.Logger.Error("error while deleting subscription: ", err)
 			}
+
+			// if there are no more webhooks for this subreddit, cancel the subscription
 			if len(b.Subreddits[subreddit]) == 0 {
 				delete(b.Subreddits, subreddit)
+				// cancel the listen goroutine
 				b.SubredditCancelFuncs[subreddit]()
 			}
 			return
 		}
 	}
-	b.Logger.Warnf("could not find webhook `%s` to remove", webhookID)
+	b.Logger.Infof("could not find webhook `%s` to remove", webhookID)
 }
 
 func (b *RedditBot) listenToSubreddit(subreddit string, ctx context.Context) {
-	b.Logger.Debugf("listening to r/%s", subreddit)
+	b.Logger.Infof("listening to r/%s", subreddit)
 	posts, errs, closer := b.RedditClient.Stream.Posts(subreddit, reddit.StreamInterval(time.Minute*3), reddit.StreamDiscardInitial)
+	defer closer()
+	defer b.Logger.Infof("stop listening to r/%s", subreddit)
 	for {
 		select {
 		case <-ctx.Done():
-			closer()
-			b.Logger.Debugf("stop listening to r/%s", subreddit)
 			return
-
 		case post := <-posts:
-			description := post.Body
-			if len(description) > 4096 {
-				description = string([]rune(description)[0:4093]) + "..."
-			}
-
-			url := post.URL
-			if !imageRegex.MatchString(url) {
-				url = ""
-			}
-			title := post.Title
-			if len(title) > 256 {
-				title = string([]rune(title)[0:253]) + "..."
-			}
-
-			webhookMessageCreate := discord.WebhookMessageCreate{
-				Embeds: []discord.Embed{discord.NewEmbedBuilder().
-					SetTitle(title).
-					SetURL("https://www.reddit.com"+post.Permalink).
-					SetColor(0xff581a).
-					SetAuthorName("New post on "+post.SubredditNamePrefixed).
-					SetAuthorURL("https://www.reddit.com/"+post.SubredditNamePrefixed).
-					SetDescription(description).
-					SetImage(url).
-					AddField("Author", post.Author, false).
-					Build(),
-				},
-			}
-
-			b.SubredditsMu.Lock()
-			for _, webhookClient := range b.Subreddits[subreddit] {
-				_, err := webhookClient.CreateMessage(webhookMessageCreate)
-				if e, ok := err.(*rest.Error); ok {
-					if e.Response.StatusCode == http.StatusNotFound {
-						b.Logger.Warnf("webhook `%s` not found, removing it", webhookClient.ID)
-						go b.unsubscribeFromSubreddit(subreddit, webhookClient.ID(), true)
-						continue
-					}
-					b.Logger.Errorf("error while sending post to webhook: %s, body: %s", err, string(e.RsBody))
-				} else if err != nil {
-					b.Logger.Error("error while sending post to webhook: ", err)
-				} else {
-					b.Logger.Debugf("sent post to webhook `%s`", webhookClient.ID())
-				}
-			}
-			b.SubredditsMu.Unlock()
-
+			b.processPost(post, subreddit)
 		case err := <-errs:
-			if redditErr, ok := err.(*reddit.ErrorResponse); ok && redditErr.Response != nil && redditErr.Response.StatusCode == http.StatusNotFound {
-				b.Logger.Warnf("subreddit `%s` not found, removing it", subreddit)
-				b.SubredditsMu.Lock()
-				for _, webhookClient := range b.Subreddits[subreddit] {
-					if _, rErr := webhookClient.CreateMessage(discord.WebhookMessageCreate{
-						Embeds: []discord.Embed{discord.NewEmbedBuilder().
-							SetDescriptionf("The subreddit `%s` you were subscribed to seems to no longer exists.\nDeleting the webhook.", subreddit).
-							SetColor(0xff581a).
-							Build(),
-						},
-					}); rErr != nil {
-						b.Logger.Error("error while sending delete to webhook: ", rErr)
-					}
-					go b.unsubscribeFromSubreddit(subreddit, webhookClient.ID(), true)
-				}
-				b.SubredditsMu.Unlock()
-				continue
-			}
-			b.Logger.Error("received error from reddit post stream: ", err)
+			b.processError(err, subreddit)
 		}
 	}
+}
+
+func (b *RedditBot) processPost(post *reddit.Post, subreddit string) {
+	title := cutString(post.Title, 256)
+	description := cutString(post.Body, 4096)
+
+	url := post.URL
+	if !imageRegex.MatchString(url) {
+		url = ""
+	}
+
+	webhookMessageCreate := discord.WebhookMessageCreate{
+		Embeds: []discord.Embed{discord.NewEmbedBuilder().
+			SetTitle(title).
+			SetURL("https://www.reddit.com"+post.Permalink).
+			SetColor(EmbedColor).
+			SetAuthorName("New post on "+post.SubredditNamePrefixed).
+			SetAuthorURL("https://www.reddit.com/"+post.SubredditNamePrefixed).
+			SetDescription(description).
+			SetImage(url).
+			AddField("Author", post.Author, false).
+			Build(),
+		},
+	}
+
+	b.SubredditsMu.Lock()
+	defer b.SubredditsMu.Unlock()
+	for _, webhookClient := range b.Subreddits[subreddit] {
+		b.sendPostToWebhook(webhookClient, webhookMessageCreate, subreddit, 1)
+	}
+}
+
+func (b *RedditBot) sendPostToWebhook(webhookClient webhook.Client, messageCreate discord.WebhookMessageCreate, subreddit string, try int) {
+	_, err := webhookClient.CreateMessage(messageCreate)
+	if e, ok := err.(*rest.Error); ok {
+		if e.Response.StatusCode == http.StatusNotFound {
+			b.Logger.Warnf("webhook `%s` not found, removing it", webhookClient.ID)
+			go b.unsubscribeFromSubreddit(subreddit, webhookClient.ID())
+			return
+		}
+		if try > MaxRetries {
+			b.Logger.Errorf("error while sending post to webhook, exceeded %d tries: %s, body: %s", MaxRetries, err, string(e.RsBody))
+			return
+		}
+		b.Logger.Errorf("error while sending post to webhook, retrying: %s, body: %s", err, string(e.RsBody))
+		b.sendPostToWebhook(webhookClient, messageCreate, subreddit, try+1)
+		return
+	} else if err != nil {
+		if try > MaxRetries {
+			b.Logger.Errorf("error while sending post to webhook, exceeded %d tries: %s", MaxRetries, err)
+			return
+		}
+		b.Logger.Error("error while sending post to webhook, retrying: ", err)
+		b.sendPostToWebhook(webhookClient, messageCreate, subreddit, try+1)
+		return
+	}
+	b.Logger.Debugf("sent post to webhook `%s`", webhookClient.ID())
+}
+
+func (b *RedditBot) processError(err error, subreddit string) {
+	if redditErr, ok := err.(*reddit.ErrorResponse); ok && redditErr.Response != nil && redditErr.Response.StatusCode == http.StatusNotFound {
+		b.Logger.Infof("subreddit `%s` not found, removing it", subreddit)
+		b.SubredditsMu.Lock()
+		defer b.SubredditsMu.Unlock()
+		for _, webhookClient := range b.Subreddits[subreddit] {
+			if _, rErr := webhookClient.CreateMessage(discord.WebhookMessageCreate{
+				Embeds: []discord.Embed{discord.NewEmbedBuilder().
+					SetDescriptionf("The subreddit `%s` you were subscribed to seems to no longer exists.\nDeleting the webhook.", subreddit).
+					SetColor(EmbedColor).
+					Build(),
+				},
+			}); rErr != nil {
+				b.Logger.Error("error while sending delete to webhook: ", rErr)
+			}
+			go b.unsubscribeFromSubreddit(subreddit, webhookClient.ID())
+		}
+		return
+	}
+	b.Logger.Error("received error from reddit post stream: ", err)
 }
 
 func (b *RedditBot) loadAllSubreddits() error {
@@ -154,4 +173,12 @@ func (b *RedditBot) loadAllSubreddits() error {
 		b.subscribeToSubreddit(subscription.Subreddit, webhookClient)
 	}
 	return nil
+}
+
+func cutString(str string, maxLen int) string {
+	runes := []rune(str)
+	if len(runes) > maxLen {
+		return string(runes[0:maxLen-1]) + "…"
+	}
+	return string(runes)
 }
