@@ -115,7 +115,7 @@ func (b *RedditBot) sendPostToWebhook(webhookClient webhook.Client, messageCreat
 	_, err := webhookClient.CreateMessage(messageCreate)
 	if e, ok := err.(*rest.Error); ok {
 		if e.Response.StatusCode == http.StatusNotFound {
-			b.Logger.Warnf("webhook `%s` not found, removing it", webhookClient.ID)
+			b.Logger.Warnf("webhook `%s` not found, removing it", webhookClient.ID())
 			go b.unsubscribeFromSubreddit(subreddit, webhookClient.ID())
 			return
 		}
