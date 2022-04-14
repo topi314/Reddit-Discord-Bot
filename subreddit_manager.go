@@ -15,7 +15,7 @@ import (
 const MaxRetries = 10
 
 func (b *RedditBot) subscribeToSubreddit(subreddit string, webhookClient webhook.Client) {
-	b.Logger.Infof("subscribing to r/%s", subreddit)
+	b.Logger.Debugf("subscribing to r/%s", subreddit)
 	b.SubredditsMu.Lock()
 	defer b.SubredditsMu.Unlock()
 	_, ok := b.Subreddits[subreddit]
@@ -33,7 +33,7 @@ func (b *RedditBot) subscribeToSubreddit(subreddit string, webhookClient webhook
 }
 
 func (b *RedditBot) unsubscribeFromSubreddit(subreddit string, webhookID snowflake.Snowflake) {
-	b.Logger.Infof("unsubscribing from r/%s", subreddit)
+	b.Logger.Debugf("unsubscribing from r/%s", subreddit)
 	b.SubredditsMu.Lock()
 	defer b.SubredditsMu.Unlock()
 	_, ok := b.Subreddits[subreddit]
@@ -65,10 +65,10 @@ func (b *RedditBot) unsubscribeFromSubreddit(subreddit string, webhookID snowfla
 }
 
 func (b *RedditBot) listenToSubreddit(subreddit string, ctx context.Context) {
-	b.Logger.Infof("listening to r/%s", subreddit)
+	b.Logger.Debugf("listening to r/%s", subreddit)
 	posts, errs, closer := b.RedditClient.Stream.Posts(subreddit, reddit.StreamInterval(time.Minute*3), reddit.StreamDiscardInitial)
 	defer closer()
-	defer b.Logger.Infof("stop listening to r/%s", subreddit)
+	defer b.Logger.Debugf("stop listening to r/%s", subreddit)
 	for {
 		select {
 		case <-ctx.Done():
