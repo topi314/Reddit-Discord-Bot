@@ -2,7 +2,7 @@ FROM golang:1.18-alpine AS build
 
 WORKDIR /tmp/app
 
-COPY . .
+COPY .. .
 
 RUN apk add --no-cache git && \
     go mod download && \

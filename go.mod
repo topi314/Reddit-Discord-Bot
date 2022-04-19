@@ -8,10 +8,6 @@ require (
 	github.com/disgoorg/log v1.2.0
 	github.com/disgoorg/snowflake v1.1.0
 	github.com/sirupsen/logrus v1.8.1
-	github.com/uptrace/bun v1.1.1
-	github.com/uptrace/bun/dialect/pgdialect v1.1.1
-	github.com/uptrace/bun/driver/pgdriver v1.1.1
-	github.com/uptrace/bun/extra/bundebug v1.1.1
 	github.com/vartanbeno/go-reddit/v2 v2.0.1
 )
 
