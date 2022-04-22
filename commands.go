@@ -44,6 +44,10 @@ var commands = []discord.ApplicationCommandCreate{
 				Name:        "list",
 				Description: "lists all added subreddits",
 			},
+			discord.ApplicationCommandOptionSubCommand{
+				Name:        "info",
+				Description: "prints info about myself",
+			},
 		},
 		DefaultPermission: true,
 	},
@@ -69,6 +73,9 @@ func (b *RedditBot) onApplicationCommandInteraction(event *events.ApplicationCom
 
 		case "list":
 			err = b.onSubredditList(event)
+
+		case "info":
+			err = b.onSubredditInfo(event)
 		}
 	}
 	if err != nil {
@@ -160,9 +167,7 @@ func (b *RedditBot) onSubredditList(event *events.ApplicationCommandInteractionE
 	if err := b.DB.NewSelect().Model(&subscriptions).Where("guild_id = ?", *event.GuildID()).Scan(context.TODO()); err != nil {
 		message = "There was an error retrieving your subreddits"
 	} else {
-		b.SubredditsMu.Lock()
-		defer b.SubredditsMu.Unlock()
-		if len(b.Subreddits) == 0 {
+		if len(subscriptions) == 0 {
 			message = "no linked subreddits found"
 		} else {
 			message = "Following subreddits are linked:\n"
@@ -174,6 +179,16 @@ func (b *RedditBot) onSubredditList(event *events.ApplicationCommandInteractionE
 	return event.CreateMessage(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
 		SetContentf(message).
+		Build(),
+	)
+}
+
+func (b *RedditBot) onSubredditInfo(event *events.ApplicationCommandInteractionEvent) error {
+	b.SubredditsMu.Lock()
+	defer b.SubredditsMu.Unlock()
+	return event.CreateMessage(discord.NewMessageCreateBuilder().
+		SetEphemeral(true).
+		SetContentf("not stuck").
 		Build(),
 	)
 }

@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"regexp"
 	"syscall"
 	"time"
 
+	grmon "github.com/bcicen/grmon/agent"
 	"github.com/disgoorg/disgo/webhook"
 	"github.com/disgoorg/dislog"
 	"github.com/disgoorg/snowflake"
@@ -43,6 +45,7 @@ var (
 )
 
 func main() {
+	grmon.Start()
 	logger := logrus.New()
 	logger.SetLevel(loglevel)
 	logger.SetReportCaller(true)

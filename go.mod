@@ -3,6 +3,7 @@ module github.com/TopiSenpai/Reddit-Discord-Bot
 go 1.18
 
 require (
+	github.com/bcicen/grmon v0.0.0-20211013120613-63facda35286
 	github.com/disgoorg/disgo v0.8.9
 	github.com/disgoorg/dislog v1.0.6-0.20220326151040-b9c67fa5c6ca
 	github.com/disgoorg/log v1.2.0
