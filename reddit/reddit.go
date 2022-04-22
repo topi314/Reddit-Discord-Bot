@@ -31,13 +31,34 @@ type Client struct {
 	tokenMu    sync.Mutex
 }
 
-func (c *Client) GetSubreddit(name string) {
-	compiledRoute, err := GetSubreddit.Compile(nil, name)
+func (c *Client) GetSubreddit(name string) (about Thing[SubredditAbout], err error) {
+	var compiledRoute *route.CompiledAPIRoute
+	compiledRoute, err = GetSubreddit.Compile(route.QueryValues{"raw_json": true}, name)
 	if err != nil {
 		return
 	}
-	var
-	c.Do(compiledRoute, nil, )
+	err = c.Do(compiledRoute, nil, &about)
+	return
+}
+
+func (c *Client) NewSubredditPosts(name string, after string, limit string) (posts Listing[SubredditAbout], err error) {
+	var compiledRoute *route.CompiledAPIRoute
+	compiledRoute, err = NewSubredditPosts.Compile(route.QueryValues{"raw_json": true, "after": after, "limit": limit}, name)
+	if err != nil {
+		return
+	}
+	err = c.Do(compiledRoute, nil, &posts)
+	return
+}
+
+func (c *Client) SearchSubredditNames(query string) (subreddits []string, err error) {
+	var compiledRoute *route.CompiledAPIRoute
+	compiledRoute, err = SearchSubredditNames.Compile(route.QueryValues{"raw_json": true, "query": query, "include_over_18": true, "include_unadvertisable": true})
+	if err != nil {
+		return
+	}
+	err = c.Do(compiledRoute, nil, &posts)
+	return
 }
 
 func (c *Client) Do(route *route.CompiledAPIRoute, rqBody any, rsBody any, opts ...rest.RequestOpt) error {
