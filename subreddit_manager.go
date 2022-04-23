@@ -107,11 +107,11 @@ func (b *RedditBot) processPost(post *reddit.Post, subreddit string) {
 	b.SubredditsMu.Lock()
 	defer b.SubredditsMu.Unlock()
 	for _, webhookClient := range b.Subreddits[subreddit] {
-		b.sendPostToWebhook(webhookClient, webhookMessageCreate, subreddit, 1)
+		b.sendPostToWebhook(webhookClient, webhookMessageCreate, subreddit)
 	}
 }
 
-func (b *RedditBot) sendPostToWebhook(webhookClient webhook.Client, messageCreate discord.WebhookMessageCreate, subreddit string, try int) {
+func (b *RedditBot) sendPostToWebhook(webhookClient webhook.Client, messageCreate discord.WebhookMessageCreate, subreddit string) {
 	_, err := webhookClient.CreateMessage(messageCreate)
 	if e, ok := err.(*rest.Error); ok {
 		if e.Response.StatusCode == http.StatusNotFound {
@@ -119,20 +119,10 @@ func (b *RedditBot) sendPostToWebhook(webhookClient webhook.Client, messageCreat
 			go b.unsubscribeFromSubreddit(subreddit, webhookClient.ID())
 			return
 		}
-		if try > MaxRetries {
-			b.Logger.Errorf("error while sending post to webhook, exceeded %d tries: %s, body: %s", MaxRetries, err, string(e.RsBody))
-			return
-		}
-		b.Logger.Errorf("error while sending post to webhook, retrying: %s, body: %s", err, string(e.RsBody))
-		b.sendPostToWebhook(webhookClient, messageCreate, subreddit, try+1)
+		b.Logger.Errorf("error while sending post to webhook, body: %s", err, string(e.RsBody))
 		return
 	} else if err != nil {
-		if try > MaxRetries {
-			b.Logger.Errorf("error while sending post to webhook, exceeded %d tries: %s", MaxRetries, err)
-			return
-		}
-		b.Logger.Error("error while sending post to webhook, retrying: ", err)
-		b.sendPostToWebhook(webhookClient, messageCreate, subreddit, try+1)
+		b.Logger.Error("error while sending post to webhook: ", err)
 		return
 	}
 	b.Logger.Debugf("sent post to webhook `%s`", webhookClient.ID())
