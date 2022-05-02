@@ -66,7 +66,7 @@ func (b *RedditBot) unsubscribeFromSubreddit(subreddit string, webhookID snowfla
 
 func (b *RedditBot) listenToSubreddit(subreddit string, ctx context.Context) {
 	b.Logger.Debugf("listening to r/%s", subreddit)
-	posts, errs, closer := b.RedditClient.Stream.Posts(subreddit, reddit.StreamInterval(time.Minute*3), reddit.StreamDiscardInitial)
+	posts, errs, closer := b.RedditClient.Stream.Posts(subreddit, reddit.StreamInterval(time.Minute*5), reddit.StreamDiscardInitial)
 	defer closer()
 	defer b.Logger.Debugf("stop listening to r/%s", subreddit)
 	for {
