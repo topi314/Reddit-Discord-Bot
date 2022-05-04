@@ -37,3 +37,6 @@ To list all subreddit subscriptions run
 ```bash
 /subreddit list
 ```
+
+# Help
+If you encounter any problems feel free to open an issue or reach out to me(`toπ#3141`) via discord [here](https://discord.gg/RKM92xXu4Y) 
