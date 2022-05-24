@@ -160,8 +160,8 @@ func (b *RedditBot) onSubredditList(event *events.ApplicationCommandInteractionE
 	if err := b.DB.NewSelect().Model(&subscriptions).Where("guild_id = ?", *event.GuildID()).Scan(context.TODO()); err != nil {
 		message = "There was an error retrieving your subreddits"
 	} else {
-		b.SubredditsMu.Lock()
-		defer b.SubredditsMu.Unlock()
+		b.SubredditsMu.RLock()
+		defer b.SubredditsMu.RUnlock()
 		if len(b.Subreddits) == 0 {
 			message = "no linked subreddits found"
 		} else {

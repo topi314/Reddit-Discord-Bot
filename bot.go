@@ -25,7 +25,7 @@ type RedditBot struct {
 	DB           *bun.DB
 
 	Subreddits           map[string][]webhook.Client
-	SubredditsMu         sync.Mutex
+	SubredditsMu         sync.RWMutex
 	SubredditCancelFuncs map[string]func()
 }
 

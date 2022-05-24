@@ -36,7 +36,7 @@ func (b *RedditBot) webhookCreateHandler(w http.ResponseWriter, r *http.Request)
 	session, err := b.OAuth2Client.StartSession(code, state, "")
 	if err != nil {
 		b.Logger.Errorf("error while exchanging code: %s", err)
-		writeError(w)
+		writeError(w, err)
 		return
 	}
 
@@ -48,7 +48,7 @@ func (b *RedditBot) webhookCreateHandler(w http.ResponseWriter, r *http.Request)
 	)
 	if err != nil {
 		b.Logger.Errorf("error creating webhook client: %s", err)
-		writeError(w)
+		writeError(w, err)
 		return
 	}
 
@@ -73,15 +73,15 @@ func (b *RedditBot) webhookCreateHandler(w http.ResponseWriter, r *http.Request)
 	)
 	message := discord.NewMessageCreateBuilder().SetEphemeral(true)
 	if err != nil {
-		b.Logger.Errorf("error while tesing webhook: %s", err)
-		message.SetContent("There was a problem setting up your webhook.\nRetry or reach out for help [here](https://discord.gg/sD3ABd5)")
+		b.Logger.Errorf("error while testing webhook: %s", err)
+		message.SetContentf("There was a problem setting up your webhook.\nError: %s\n\nRetry or reach out for help [here](https://discord.gg/sD3ABd5)", err)
 	} else {
 		message.SetContent("Successfully added webhook. Everything is ready to go")
 	}
 
 	if _, err = b.Client.Rest().Interactions().CreateFollowupMessage(webhookState.Interaction.ApplicationID(), webhookState.Interaction.Token(), message.Build()); err != nil {
 		b.Logger.Errorf("error while sending followup: %s", err)
-		writeError(w)
+		writeError(w, err)
 		return
 	}
 
@@ -92,8 +92,8 @@ func webhookCreateSuccessHandler(w http.ResponseWriter, _ *http.Request) {
 	writeMessage(w, http.StatusOK, `subreddit successfully created.<br />You can now close this site<br /><br />For further questions you can reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a>`)
 }
 
-func writeError(w http.ResponseWriter) {
-	writeMessage(w, http.StatusInternalServerError, `There was a problem setting up your subreddit notifications<br />Retry or reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a> for help`)
+func writeError(w http.ResponseWriter, err error) {
+	writeMessage(w, http.StatusInternalServerError, `There was a problem setting up your subreddit notifications<br />Error: `+err.Error()+`<br /><br />Retry or reach out <a href="https://discord.gg/sD3ABd5" target="_blank">here</a> for help`)
 }
 
 func writeMessage(w http.ResponseWriter, status int, message string) {

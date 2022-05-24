@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/disgoorg/disgo/discord"
@@ -104,11 +105,18 @@ func (b *RedditBot) processPost(post *reddit.Post, subreddit string) {
 		},
 	}
 
-	b.SubredditsMu.Lock()
-	defer b.SubredditsMu.Unlock()
-	for _, webhookClient := range b.Subreddits[subreddit] {
-		b.sendPostToWebhook(webhookClient, webhookMessageCreate, subreddit)
+	b.SubredditsMu.RLock()
+	defer b.SubredditsMu.RUnlock()
+	var wg sync.WaitGroup
+	for i := range b.Subreddits[subreddit] {
+		webhookClient := b.Subreddits[subreddit][i]
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			b.sendPostToWebhook(webhookClient, webhookMessageCreate, subreddit)
+		}()
 	}
+	wg.Wait()
 }
 
 func (b *RedditBot) sendPostToWebhook(webhookClient webhook.Client, messageCreate discord.WebhookMessageCreate, subreddit string) {
@@ -131,8 +139,8 @@ func (b *RedditBot) sendPostToWebhook(webhookClient webhook.Client, messageCreat
 func (b *RedditBot) processError(err error, subreddit string) {
 	if redditErr, ok := err.(*reddit.ErrorResponse); ok && redditErr.Response != nil && redditErr.Response.StatusCode == http.StatusNotFound {
 		b.Logger.Infof("subreddit `%s` not found, removing it", subreddit)
-		b.SubredditsMu.Lock()
-		defer b.SubredditsMu.Unlock()
+		b.SubredditsMu.RLock()
+		defer b.SubredditsMu.RUnlock()
 		for _, webhookClient := range b.Subreddits[subreddit] {
 			if _, rErr := webhookClient.CreateMessage(discord.WebhookMessageCreate{
 				Embeds: []discord.Embed{discord.NewEmbedBuilder().
