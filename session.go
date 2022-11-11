@@ -17,7 +17,7 @@ func (s *Session) AccessToken() string { panic("implement me") }
 
 func (s *Session) RefreshToken() string { panic("implement me") }
 
-func (s *Session) Scopes() []discord.ApplicationScope { panic("implement me") }
+func (s *Session) Scopes() []discord.OAuth2Scope { panic("implement me") }
 
 func (s *Session) TokenType() discord.TokenType { panic("implement me") }
 

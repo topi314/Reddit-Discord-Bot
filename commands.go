@@ -15,7 +15,7 @@ var subredditNamePattern = regexp.MustCompile(`\A(r/)?(?P<name>[A-Za-z\d]\w{2,20
 
 var commands = []discord.ApplicationCommandCreate{
 	discord.SlashCommandCreate{
-		CommandName: "subreddit",
+		Name:        "subreddit",
 		Description: "lets you manage all your subreddits",
 		Options: []discord.ApplicationCommandOption{
 			discord.ApplicationCommandOptionSubCommand{
@@ -45,11 +45,10 @@ var commands = []discord.ApplicationCommandCreate{
 				Description: "lists all added subreddits",
 			},
 		},
-		DefaultPermission: true,
 	},
 }
 
-func (b *RedditBot) onApplicationCommandInteraction(event *events.ApplicationCommandInteractionEvent) {
+func (b *RedditBot) onApplicationCommandInteraction(event *events.ApplicationCommandInteractionCreate) {
 	data := event.SlashCommandInteractionData()
 	var err error
 	if data.CommandName() == "subreddit" {
@@ -84,7 +83,7 @@ func parseSubredditName(name string) (string, bool) {
 	return strings.ToLower(match[subredditNamePattern.SubexpIndex("name")]), true
 }
 
-func (b *RedditBot) onSubredditAdd(event *events.ApplicationCommandInteractionEvent, data discord.SlashCommandInteractionData) error {
+func (b *RedditBot) onSubredditAdd(event *events.ApplicationCommandInteractionCreate, data discord.SlashCommandInteractionData) error {
 	subreddit, ok := parseSubredditName(data.String("subreddit"))
 	if !ok {
 		return event.CreateMessage(discord.NewMessageCreateBuilder().
@@ -113,7 +112,7 @@ func (b *RedditBot) onSubredditAdd(event *events.ApplicationCommandInteractionEv
 		)
 	}
 
-	url, state := b.OAuth2Client.GenerateAuthorizationURLState(baseURL+CreateCallbackURL, 0, *event.GuildID(), false, discord.ApplicationScopeWebhookIncoming)
+	url, state := b.OAuth2Client.GenerateAuthorizationURLState(baseURL+CreateCallbackURL, 0, *event.GuildID(), false, discord.OAuth2ScopeWebhookIncoming)
 
 	webhookCreateStates[state] = WebhookCreateState{
 		Interaction: event.ApplicationCommandInteraction,
@@ -127,7 +126,7 @@ func (b *RedditBot) onSubredditAdd(event *events.ApplicationCommandInteractionEv
 	)
 }
 
-func (b *RedditBot) onSubredditRemove(event *events.ApplicationCommandInteractionEvent, data discord.SlashCommandInteractionData) error {
+func (b *RedditBot) onSubredditRemove(event *events.ApplicationCommandInteractionCreate, data discord.SlashCommandInteractionData) error {
 	subreddit, ok := parseSubredditName(data.String("subreddit"))
 	if !ok {
 		return event.CreateMessage(discord.NewMessageCreateBuilder().
@@ -154,7 +153,7 @@ func (b *RedditBot) onSubredditRemove(event *events.ApplicationCommandInteractio
 	)
 }
 
-func (b *RedditBot) onSubredditList(event *events.ApplicationCommandInteractionEvent) error {
+func (b *RedditBot) onSubredditList(event *events.ApplicationCommandInteractionCreate) error {
 	var subscriptions []*Subscription
 	var message string
 	if err := b.DB.NewSelect().Model(&subscriptions).Where("guild_id = ?", *event.GuildID()).Scan(context.TODO()); err != nil {

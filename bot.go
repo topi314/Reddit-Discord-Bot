@@ -7,6 +7,7 @@ import (
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/cache"
+	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/httpserver"
 	"github.com/disgoorg/disgo/oauth2"
@@ -39,13 +40,12 @@ func (b *RedditBot) Setup() error {
 		bot.WithLogger(b.Logger),
 		bot.WithCacheConfigOpts(
 			cache.WithCacheFlags(cache.FlagsNone),
-			cache.WithMemberCachePolicy(cache.MemberCachePolicyNone),
-			cache.WithMessageCachePolicy(cache.MessageCachePolicyNone),
+			cache.WithMemberCachePolicy(cache.PolicyNone[discord.Member]),
+			cache.WithMessageCachePolicy(cache.PolicyNone[discord.Message]),
 		),
-		bot.WithHTTPServerConfigOpts(
+		bot.WithHTTPServerConfigOpts(publicKey,
 			httpserver.WithAddress(webhookServerAddress),
 			httpserver.WithURL(InteractionCallbackURL),
-			httpserver.WithPublicKey(publicKey),
 			httpserver.WithServeMux(serveMux),
 		),
 		bot.WithEventListeners(&events.ListenerAdapter{
@@ -56,11 +56,11 @@ func (b *RedditBot) Setup() error {
 }
 
 func (b *RedditBot) Start() error {
-	return b.Client.StartHTTPServer()
+	return b.Client.OpenHTTPServer()
 }
 
 func (b *RedditBot) SetupCommands() error {
-	_, err := b.Client.Rest().Applications().SetGlobalCommands(b.Client.ApplicationID(), commands)
+	_, err := b.Client.Rest().SetGlobalCommands(b.Client.ApplicationID(), commands)
 	return err
 }
 

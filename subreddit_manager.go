@@ -9,7 +9,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/disgo/webhook"
-	"github.com/disgoorg/snowflake"
+	"github.com/disgoorg/snowflake/v2"
 	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
 
@@ -33,7 +33,7 @@ func (b *RedditBot) subscribeToSubreddit(subreddit string, webhookClient webhook
 	}
 }
 
-func (b *RedditBot) unsubscribeFromSubreddit(subreddit string, webhookID snowflake.Snowflake) {
+func (b *RedditBot) unsubscribeFromSubreddit(subreddit string, webhookID snowflake.ID) {
 	b.Logger.Debugf("unsubscribing from r/%s", subreddit)
 	b.SubredditsMu.Lock()
 	defer b.SubredditsMu.Unlock()
@@ -164,7 +164,7 @@ func (b *RedditBot) loadAllSubreddits() error {
 		return err
 	}
 	for _, subscription := range subscriptions {
-		webhookClient := webhook.NewClient(subscription.WebhookID, subscription.WebhookToken,
+		webhookClient := webhook.New(subscription.WebhookID, subscription.WebhookToken,
 			webhook.WithRestClientConfigOpts(rest.WithHTTPClient(b.HTTPClient)),
 			webhook.WithLogger(b.Logger),
 		)

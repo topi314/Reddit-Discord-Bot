@@ -40,7 +40,7 @@ func (b *RedditBot) webhookCreateHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	webhookClient := webhook.NewClient(session.Webhook().ID(), session.Webhook().Token,
+	webhookClient := webhook.New(session.Webhook().ID(), session.Webhook().Token,
 		webhook.WithRestClientConfigOpts(
 			rest.WithHTTPClient(b.HTTPClient),
 		),
@@ -79,7 +79,7 @@ func (b *RedditBot) webhookCreateHandler(w http.ResponseWriter, r *http.Request)
 		message.SetContent("Successfully added webhook. Everything is ready to go")
 	}
 
-	if _, err = b.Client.Rest().Interactions().CreateFollowupMessage(webhookState.Interaction.ApplicationID(), webhookState.Interaction.Token(), message.Build()); err != nil {
+	if _, err = b.Client.Rest().CreateFollowupMessage(webhookState.Interaction.ApplicationID(), webhookState.Interaction.Token(), message.Build()); err != nil {
 		b.Logger.Errorf("error while sending followup: %s", err)
 		writeError(w, err)
 		return

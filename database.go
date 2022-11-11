@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/disgoorg/snowflake"
+	"github.com/disgoorg/snowflake/v2"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
@@ -42,9 +42,9 @@ func (b *RedditBot) SetupDB() error {
 }
 
 type Subscription struct {
-	Subreddit    string              `bun:"subreddit,pk"`
-	GuildID      snowflake.Snowflake `bun:"guild_id,pk"`
-	ChannelID    snowflake.Snowflake `bun:"channel_id,pk"`
-	WebhookID    snowflake.Snowflake `bun:"webhook_id,notnull"`
-	WebhookToken string              `bun:"webhook_token,notnull"`
+	Subreddit    string       `bun:"subreddit,pk"`
+	GuildID      snowflake.ID `bun:"guild_id,pk"`
+	ChannelID    snowflake.ID `bun:"channel_id,pk"`
+	WebhookID    snowflake.ID `bun:"webhook_id,notnull"`
+	WebhookToken string       `bun:"webhook_token,notnull"`
 }

@@ -11,7 +11,7 @@ import (
 
 	"github.com/disgoorg/disgo/webhook"
 	"github.com/disgoorg/dislog"
-	"github.com/disgoorg/snowflake"
+	"github.com/disgoorg/snowflake/v2"
 	"github.com/sirupsen/logrus"
 	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
@@ -26,7 +26,7 @@ const (
 
 var (
 	token                = os.Getenv("token")
-	logWebhookID         = snowflake.GetSnowflakeEnv("log_webhook_id")
+	logWebhookID         = snowflake.GetEnv("log_webhook_id")
 	logWebhookToken      = os.Getenv("log_webhook_token")
 	publicKey            = os.Getenv("public_key")
 	secret               = os.Getenv("secret")
@@ -47,7 +47,7 @@ func main() {
 	logger.SetLevel(loglevel)
 	logger.SetReportCaller(true)
 
-	if logWebhookID != "" && logWebhookToken != "" {
+	if logWebhookID != 0 && logWebhookToken != "" {
 		hook, err := dislog.New(
 			dislog.WithWebhookIDToken(logWebhookID, logWebhookToken),
 			dislog.WithLogLevels(dislog.InfoLevelAndAbove...),
