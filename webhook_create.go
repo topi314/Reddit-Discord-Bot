@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/disgoorg/disgo/discord"
-	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/disgo/webhook"
 )
 
@@ -41,9 +40,7 @@ func (b *RedditBot) webhookCreateHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	webhookClient := webhook.New(session.Webhook().ID(), session.Webhook().Token,
-		webhook.WithRestClientConfigOpts(
-			rest.WithHTTPClient(b.HTTPClient),
-		),
+		webhook.WithRestClient(b.RestClient),
 		webhook.WithLogger(b.Logger),
 	)
 	if err != nil {

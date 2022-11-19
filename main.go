@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/disgo/webhook"
 	"github.com/disgoorg/dislog"
 	"github.com/disgoorg/snowflake/v2"
@@ -64,7 +65,7 @@ func main() {
 	logger.Infof("starting Reddit-Discord-Bot...")
 	redditBot := &RedditBot{
 		Logger:               logger,
-		HTTPClient:           &http.Client{Timeout: 10 * time.Second},
+		RestClient:           rest.NewClient("", rest.WithHTTPClient(&http.Client{Timeout: 10 * time.Second})),
 		Subreddits:           map[string][]webhook.Client{},
 		SubredditCancelFuncs: map[string]func(){},
 	}

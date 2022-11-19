@@ -11,6 +11,7 @@ import (
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/httpserver"
 	"github.com/disgoorg/disgo/oauth2"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/disgo/webhook"
 	"github.com/disgoorg/log"
 	"github.com/uptrace/bun"
@@ -19,7 +20,7 @@ import (
 
 type RedditBot struct {
 	Logger       log.Logger
-	HTTPClient   *http.Client
+	RestClient   rest.Client
 	Client       bot.Client
 	OAuth2Client oauth2.Client
 	RedditClient *reddit.Client

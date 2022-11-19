@@ -165,7 +165,7 @@ func (b *RedditBot) loadAllSubreddits() error {
 	}
 	for _, subscription := range subscriptions {
 		webhookClient := webhook.New(subscription.WebhookID, subscription.WebhookToken,
-			webhook.WithRestClientConfigOpts(rest.WithHTTPClient(b.HTTPClient)),
+			webhook.WithRestClient(b.RestClient),
 			webhook.WithLogger(b.Logger),
 		)
 		b.subscribeToSubreddit(subscription.Subreddit, webhookClient)
