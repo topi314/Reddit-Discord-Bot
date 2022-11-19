@@ -3,10 +3,9 @@ module github.com/TopiSenpai/Reddit-Discord-Bot
 go 1.18
 
 require (
-	github.com/disgoorg/disgo v0.13.21
+	github.com/disgoorg/disgo v0.13.23-0.20221119231304-ee9c0306629a
 	github.com/disgoorg/dislog v1.0.7
 	github.com/disgoorg/log v1.2.0
-	github.com/disgoorg/snowflake v1.1.0
 	github.com/disgoorg/snowflake/v2 v2.0.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/uptrace/bun v1.1.8
@@ -17,6 +16,7 @@ require (
 )
 
 require (
+	github.com/disgoorg/json v1.0.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
