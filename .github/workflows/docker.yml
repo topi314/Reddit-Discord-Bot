@@ -2,37 +2,43 @@ name: Docker
 
 on:
     push:
-        branches:
-            - master
-        tags:
-            - v*
-    pull_request:
-
-env:
-    IMAGE_NAME: reddit-discord-bot
 
 jobs:
-    # See also https://docs.docker.com/docker-hub/builds/
-    push:
+    docker:
         runs-on: ubuntu-latest
-        if: github.event_name == 'push'
         steps:
-            - uses: actions/checkout@v2
+            - name: Checkout
+              uses: actions/checkout@v3
 
-            - name: Build image
-              run: docker build . --file Dockerfile --tag $IMAGE_NAME
+            - name: Docker meta
+              id: meta
+              uses: docker/metadata-action@v4
+              with:
+                  images: ghcr.io/topisenpai/reddit-discord-bot
+                  tags: |
+                      type=ref,event=branch
+                      type=ref,event=tag
+                      type=ref,event=pr
+                      type=sha,prefix=
 
-            - name: Log into registry
-              run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@v2
 
-            - name: Push image
-              run: |
-                  IMAGE_ID=docker.pkg.github.com/${{ github.repository }}/$IMAGE_NAME
-                  IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-                  VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-                  [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-                  [ "$VERSION" == "master" ] && VERSION=latest
-                  echo IMAGE_ID=$IMAGE_ID
-                  echo VERSION=$VERSION
-                  docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
-                  docker push $IMAGE_ID:$VERSION
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v2
+
+            - name: Login to GitHub Container Registry
+              uses: docker/login-action@v2
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.repository_owner }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build and push
+              uses: docker/build-push-action@v3
+              with:
+                  context: .
+                  platforms: linux/amd64,linux/arm/v7,linux/arm64/v8
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
