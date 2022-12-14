@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -34,7 +35,7 @@ var (
 	baseURL              = os.Getenv("base_url")
 	webhookServerAddress = os.Getenv("webhook_server_address")
 	loglevel, _          = logrus.ParseLevel(os.Getenv("log_level"))
-	
+
 	shouldSyncCommands, _ = strconv.ParseBool(os.Getenv("should_sync_commands"))
 
 	redditID       = os.Getenv("reddit_id")
@@ -76,7 +77,7 @@ func main() {
 	if err = redditBot.Setup(); err != nil {
 		logger.Fatal("error setting up bot:", err)
 	}
-	
+
 	if shouldSyncCommands {
 		if err = redditBot.SetupCommands(); err != nil {
 			logger.Error("error setting up bot:", err)

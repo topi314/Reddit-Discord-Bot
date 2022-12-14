@@ -3,15 +3,15 @@ module github.com/TopiSenpai/Reddit-Discord-Bot
 go 1.18
 
 require (
-	github.com/disgoorg/disgo v0.13.23-0.20221119231304-ee9c0306629a
+	github.com/disgoorg/disgo v0.14.0
 	github.com/disgoorg/dislog v1.0.7
 	github.com/disgoorg/log v1.2.0
 	github.com/disgoorg/snowflake/v2 v2.0.1
 	github.com/sirupsen/logrus v1.9.0
-	github.com/uptrace/bun v1.1.8
-	github.com/uptrace/bun/dialect/pgdialect v1.1.8
-	github.com/uptrace/bun/driver/pgdriver v1.1.8
-	github.com/uptrace/bun/extra/bundebug v1.1.8
+	github.com/uptrace/bun v1.1.9
+	github.com/uptrace/bun/dialect/pgdialect v1.1.9
+	github.com/uptrace/bun/driver/pgdriver v1.1.9
+	github.com/uptrace/bun/extra/bundebug v1.1.9
 	github.com/vartanbeno/go-reddit/v2 v2.0.1
 )
 
@@ -28,11 +28,11 @@ require (
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	golang.org/x/crypto v0.2.0 // indirect
-	golang.org/x/exp v0.0.0-20221111094246-ab4555d3164f // indirect
-	golang.org/x/net v0.2.0 // indirect
-	golang.org/x/oauth2 v0.2.0 // indirect
-	golang.org/x/sys v0.2.0 // indirect
+	golang.org/x/crypto v0.4.0 // indirect
+	golang.org/x/exp v0.0.0-20221212164502-fae10dda9338 // indirect
+	golang.org/x/net v0.4.0 // indirect
+	golang.org/x/oauth2 v0.3.0 // indirect
+	golang.org/x/sys v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	mellium.im/sasl v0.3.0 // indirect
