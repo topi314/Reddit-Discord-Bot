@@ -121,15 +121,12 @@ func (b *RedditBot) processPost(post *reddit.Post, subreddit string) {
 
 func (b *RedditBot) sendPostToWebhook(webhookClient webhook.Client, messageCreate discord.WebhookMessageCreate, subreddit string) {
 	_, err := webhookClient.CreateMessage(messageCreate)
-	if e, ok := err.(*rest.Error); ok {
-		if e.Response.StatusCode == http.StatusNotFound {
+	if err != nil {
+		if e, ok := err.(*rest.Error); ok && e.Response.StatusCode == http.StatusNotFound {
 			b.Logger.Warnf("webhook `%s` not found, removing it", webhookClient.ID())
 			go b.unsubscribeFromSubreddit(subreddit, webhookClient.ID())
 			return
 		}
-		b.Logger.Errorf("error while sending post to webhook, body: %s", err, string(e.RsBody))
-		return
-	} else if err != nil {
 		b.Logger.Error("error while sending post to webhook: ", err)
 		return
 	}
