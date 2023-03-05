@@ -35,6 +35,7 @@ var (
 	baseURL              = os.Getenv("base_url")
 	webhookServerAddress = os.Getenv("webhook_server_address")
 	loglevel, _          = logrus.ParseLevel(os.Getenv("log_level"))
+	streamInterval, _    = time.ParseDuration(os.Getenv("stream_interval"))
 
 	shouldSyncCommands, _ = strconv.ParseBool(os.Getenv("should_sync_commands"))
 
