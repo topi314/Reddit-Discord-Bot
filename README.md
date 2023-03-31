@@ -6,7 +6,7 @@ The bot does not require any permissions and can't do anything in your Discord. 
 
 # Setup
 
-Invite the bot [here](https://discord.com/oauth2/authorize?client_id=846396249241288796&scope=applications.commands)
+Invite the bot ~~[here](https://discord.com/oauth2/authorize?client_id=846396249241288796&scope=applications.commands)~~ *currently out of service*
 
 ## Add Subreddit
 
