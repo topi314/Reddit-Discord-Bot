@@ -18,7 +18,7 @@ func ReadConfig() (Config, error) {
 	f := flag.NewFlagSet("config", flag.ExitOnError)
 	path := f.String("config", "./config.yml", "Path to config file (default: ./config.yml)")
 
-	f.Int("log.level", 1, "Log level (0: trace, 1: debug, 2: info, 3: warn, 4: error, 5: fatal, 6: panic)")
+	f.Int("log.level", 2, "Log level (0: trace, 1: debug, 2: info, 3: warn, 4: error, 5: fatal, 6: panic)")
 	f.Bool("log.add_source", false, "Add source to log ")
 
 	f.Bool("server.enabled", true, "Server enabled")
