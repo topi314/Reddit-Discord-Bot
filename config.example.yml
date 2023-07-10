@@ -1,0 +1,27 @@
+server:
+  enabled: true
+  listen_addr: :8080
+  endpoint: /callback/discord
+  redirect_url: https://example.com/callback/discord
+
+discord:
+  token: ...
+  client_secret: ...
+
+reddit:
+  client_id: ...
+  client_secret: ...
+
+database:
+  type: sqlite
+
+  postgres:
+    host: localhost
+    port: 5432
+    username: postgres
+    password: postgres
+    database: postgres
+    ssl_mode: disable
+
+  sqlite:
+    path: ./database.db
