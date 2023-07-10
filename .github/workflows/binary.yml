@@ -48,8 +48,8 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v2
         with:
-          name: reddit-discord-bot
-          path: reddit-discord-bot
+          name: reddit-discord-bot ${{ matrix.goos }} ${{ matrix.goarch }}
+          path: reddit-discord-bot-*
 
       - name: Release
         if: ${{ github.event_name == 'release' }}
