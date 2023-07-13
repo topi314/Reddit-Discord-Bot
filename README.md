@@ -92,6 +92,18 @@ $ ./reddit-discord-bot -config config.yml
 
 ### Docker-Compose
 
+Docker-Compose is the easiest way to run the bot and is also the way I recommend.
+
+#### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker-Compose](https://docs.docker.com/compose/install/)
+- [PostgreSQL](https://www.postgresql.org/download/) (optional)
+
+#### Setup
+
+Create a `docker-compose.yml` file and paste the following into it
+
 ```bash
 version: "3.8"
 
@@ -101,14 +113,41 @@ services:
     container_name: reddit-bot
     restart: unless-stopped
     volumes:
-	  - ./config.yml:/var/lib/reddit-discord-bot/config.yml
-	  - ./database.db:/var/lib/reddit-discord-bot/database.db
+      - ./config.yml:/var/lib/reddit-discord-bot/config.yml
+      - ./database.db:/var/lib/reddit-discord-bot/database.db
 ```
+
+#### Configuration
+
+Create a `config.yml` file and paste [this](/config.example.yml) into it.
+
+Fill in the required fields, and you are good to go!
+
+Also create a `database.db` file if you want to use SQLite.
+
+#### Running
 
 You can now run the bot with
 
 ```bash
 $ docker-compose up -d
+```
+
+#### Updating
+
+To update the bot just run
+
+```bash
+$ docker-compose pull
+$ docker-compose up -d
+```
+
+#### Stopping
+
+To stop the bot run
+
+```bash
+$ docker-compose down
 ```
 
 # Help
