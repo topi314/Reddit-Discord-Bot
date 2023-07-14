@@ -155,9 +155,9 @@ func (b *Bot) sendPost(subscription Subscription, post RedditPost) {
 
 	postsSent.With(prometheus.Labels{
 		"subreddit":  subscription.Subreddit,
-		"webhook.id": strconv.FormatUint(uint64(subscription.WebhookID), 10),
-		"guild.id":   strconv.FormatUint(uint64(subscription.GuildID), 10),
-		"channel.id": strconv.FormatUint(uint64(subscription.ChannelID), 10),
+		"webhook_id": strconv.FormatUint(uint64(subscription.WebhookID), 10),
+		"guild_id":   strconv.FormatUint(uint64(subscription.GuildID), 10),
+		"channel_id": strconv.FormatUint(uint64(subscription.ChannelID), 10),
 	}).Inc()
 
 	if b.Cfg.TestMode {
