@@ -65,7 +65,7 @@ func (d *DB) AddSubscription(sub Subscription) error {
 
 func (d *DB) RemoveSubscription(webhookID snowflake.ID) (*Subscription, error) {
 	var sub Subscription
-	if err := d.dbx.Select(&sub, `DELETE FROM subscriptions WHERE webhook_id = $1 RETURNING *`, webhookID); err != nil {
+	if err := d.dbx.Get(&sub, `DELETE FROM subscriptions WHERE webhook_id = $1 RETURNING *`, webhookID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrSubscriptionNotFound
 		}
@@ -77,7 +77,7 @@ func (d *DB) RemoveSubscription(webhookID snowflake.ID) (*Subscription, error) {
 
 func (d *DB) RemoveSubscriptionByGuildSubreddit(guildID snowflake.ID, subreddit string) (*Subscription, error) {
 	var sub Subscription
-	if err := d.dbx.Select(&sub, `DELETE FROM subscriptions WHERE guild_id = $1 AND subreddit = $2 RETURNING *`, guildID, subreddit); err != nil {
+	if err := d.dbx.Get(&sub, `DELETE FROM subscriptions WHERE guild_id = $1 AND subreddit = $2 RETURNING *`, guildID, subreddit); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrSubscriptionNotFound
 		}
