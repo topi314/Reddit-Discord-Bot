@@ -10,6 +10,8 @@ import (
 
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/log"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 
 	"golang.org/x/oauth2"
 )
@@ -46,6 +48,8 @@ type Reddit struct {
 	config *oauth2.Config
 	client *http.Client
 
+	counter metric.Int64Counter
+
 	rateLimit rateLimit
 	token     *oauth2.Token
 	mu        sync.Mutex
@@ -77,8 +81,10 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 	if important {
 		limit = 1
 	}
+	var sleep time.Duration
 	if r.rateLimit.remaining <= limit && now.Before(r.rateLimit.reset) {
-		time.Sleep(r.rateLimit.reset.Sub(now))
+		sleep = r.rateLimit.reset.Sub(now)
+		time.Sleep(sleep)
 	}
 
 	token, err := r.getToken()
@@ -112,6 +118,19 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 		used:      int(used),
 		remaining: int(remaining),
 		reset:     now.Add(time.Second * time.Duration(reset)),
+	}
+
+	if r.counter != nil {
+		r.counter.Add(context.Background(), 1, metric.WithAttributes(
+			attribute.String("path", rq.URL.Path),
+			attribute.String("method", rq.Method),
+			attribute.Int("status", rs.StatusCode),
+			attribute.Int64("sleep", int64(sleep)),
+			attribute.Int("used", r.rateLimit.used),
+			attribute.Int("remaining", r.rateLimit.remaining),
+			attribute.Int64("reset", r.rateLimit.reset.Unix()),
+			attribute.Bool("important", important),
+		))
 	}
 
 	return rs, nil

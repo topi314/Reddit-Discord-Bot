@@ -8,6 +8,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/log"
 	"github.com/disgoorg/snowflake/v2"
+	"go.opentelemetry.io/otel/metric"
 	"golang.org/x/oauth2"
 )
 
@@ -21,6 +22,7 @@ type SetupState struct {
 type Bot struct {
 	Cfg           Config
 	RedditIcon    []byte
+	Meter         metric.Meter
 	Client        bot.Client
 	Reddit        *Reddit
 	DB            *DB
@@ -30,6 +32,9 @@ type Bot struct {
 
 	States    map[string]SetupState
 	LastPosts map[snowflake.ID]string
+
+	PostsSentGauge    metric.Int64Counter
+	SubredditsCounter metric.Int64UpDownCounter
 }
 
 func (b *Bot) randomString(length int) string {

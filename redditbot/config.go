@@ -16,7 +16,9 @@ import (
 
 func ReadConfig() (Config, error) {
 	f := flag.NewFlagSet("config", flag.ExitOnError)
-	path := f.String("config", "./config.yml", "Path to config file (default: ./config.yml)")
+	path := f.String("config", "./config.yml", "Endpoint to config file (default: ./config.yml)")
+
+	f.Bool("test_mode", false, "Test mode (default: false)")
 
 	f.Int("log.level", 2, "Log level (0: trace, 1: debug, 2: info, 3: warn, 4: error, 5: fatal, 6: panic)")
 	f.Bool("log.add_source", false, "Add source to log ")
@@ -42,6 +44,12 @@ func ReadConfig() (Config, error) {
 	f.String("database.postgres.password", "postgres", "Postgres password (default: postgres)")
 	f.String("database.postgres.database", "reddit-bot", "Postgres database (default: reddit-bot)")
 	f.String("database.postgres.ssl_mode", "disable", "Postgres SSL mode (default: disable)")
+
+	f.String("otel.enabled", "false", "Otel enabled (default: false)")
+	f.String("otel.instance_id", "01", "Otel instance ID (default: 01)")
+	f.String("otel.metrics.listen_addr", ":8081", "Otel metrics listen address (default: :8081")
+	f.String("otel.metrics.endpoint", "/metrics", "Otel metrics endpoint (default: /metrics)")
+
 	if err := f.Parse(os.Args[1:]); err != nil {
 		return Config{}, err
 	}
@@ -68,20 +76,24 @@ func ReadConfig() (Config, error) {
 }
 
 type Config struct {
+	TestMode bool           `koanf:"test_mode"`
 	Log      LogConfig      `koanf:"log"`
 	Server   ServerConfig   `koanf:"server"`
 	Discord  DiscordConfig  `koanf:"discord"`
 	Reddit   RedditConfig   `koanf:"reddit"`
 	Database DatabaseConfig `koanf:"database"`
+	Otel     OtelConfig     `koanf:"otel"`
 }
 
 func (c Config) String() string {
-	return fmt.Sprintf("\nLog: %s\nServer: %s\nDiscord: %s\nReddit: %v\nDatabase: %s",
+	return fmt.Sprintf("\nTestMode: %t\nLog: %s\nServer: %s\nDiscord: %s\nReddit: %v\nDatabase: %s\nOtel: %s",
+		c.TestMode,
 		c.Log,
 		c.Server,
 		c.Discord,
 		c.Reddit,
 		c.Database,
+		c.Otel,
 	)
 }
 
@@ -311,4 +323,50 @@ func (c SQLiteConfig) Validate() error {
 
 func (c SQLiteConfig) DataSourceName() string {
 	return c.Path
+}
+
+type OtelConfig struct {
+	Enabled    bool          `koanf:"enabled"`
+	InstanceID string        `koanf:"instance_id"`
+	Metrics    MetricsConfig `koanf:"metrics"`
+}
+
+func (c OtelConfig) String() string {
+	return fmt.Sprintf("\n  Enabled: %v\n  InstanceID: %v\n  Metrics: %v",
+		c.Enabled,
+		c.InstanceID,
+		c.Metrics,
+	)
+}
+
+func (c OtelConfig) Validate() error {
+	if !c.Enabled {
+		return nil
+	}
+	if c.InstanceID == "" {
+		return fmt.Errorf("otel.instance_id must be set")
+	}
+	return c.Metrics.Validate()
+}
+
+type MetricsConfig struct {
+	ListenAddr string `koanf:"listen_addr"`
+	Endpoint   string `koanf:"endpoint"`
+}
+
+func (c MetricsConfig) String() string {
+	return fmt.Sprintf("\n   ListenAddr: %v\n   Endpoint: %v",
+		c.ListenAddr,
+		c.Endpoint,
+	)
+}
+
+func (c MetricsConfig) Validate() error {
+	if c.ListenAddr == "" {
+		return fmt.Errorf("otel.metrics.listen_addr must be set")
+	}
+	if c.Endpoint == "" {
+		return fmt.Errorf("otel.metrics.endpoint must be set")
+	}
+	return nil
 }

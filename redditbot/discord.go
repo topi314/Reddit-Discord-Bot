@@ -7,7 +7,6 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
-	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
 )
@@ -149,16 +148,13 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 func (b *Bot) OnSubredditRemove(data discord.SlashCommandInteractionData, event *events.ApplicationCommandInteractionCreate) {
 	subreddit := data.String("subreddit")
 
-	sub, err := b.DB.RemoveSubscriptionByGuildSubreddit(*event.GuildID(), subreddit)
-	if err != nil {
+	if err := b.RemoveSubscriptionByGuildSubreddit(*event.GuildID(), subreddit, fmt.Sprintf("Removed subreddit %s by %s", subreddit, event.User().Tag())); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: fmt.Sprintf("Something went wrong: %s", err),
 			Flags:   discord.MessageFlagEphemeral,
 		})
 		return
 	}
-
-	_ = b.Client.Rest().DeleteWebhookWithToken(sub.WebhookID, sub.WebhookToken, rest.WithReason(fmt.Sprintf("Removed subreddit %s by %s", subreddit, event.User().Tag())))
 
 	_ = event.CreateMessage(discord.MessageCreate{
 		Content: fmt.Sprintf("Removed subreddit %s", subreddit),

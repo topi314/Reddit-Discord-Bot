@@ -1,3 +1,6 @@
+# if test_mode is true, the bot will not post to discord and instead log all posts which would have been made
+test_mode: false
+
 log:
   # 0: trace, 1: debug, 2: info, 3: warn, 4: error, 5: fatal, 6: panic
   level: 2
@@ -29,3 +32,10 @@ database:
     ssl_mode: disable
   sqlite:
     path: ./database.db
+
+otel:
+  enabled: false
+  instance_id: 01
+  metrics:
+    listen_addr: :8081
+    endpoint: /metrics

@@ -1,12 +1,16 @@
 package redditbot
 
 import (
+	"context"
 	"errors"
 	"html"
 	"net/http"
 	"time"
 
 	"github.com/disgoorg/log"
+	"github.com/disgoorg/snowflake/v2"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
@@ -25,6 +29,61 @@ var (
 	ErrSubredditNotFound  = errors.New("subreddit not found")
 	ErrSubredditForbidden = errors.New("subreddit forbidden")
 )
+
+func (b *Bot) AddSubscription(subscription Subscription) error {
+	if err := b.DB.AddSubscription(subscription); err != nil {
+		return err
+	}
+
+	if b.SubredditsCounter != nil {
+		b.SubredditsCounter.Add(context.Background(), 1, metric.WithAttributes(
+			attribute.String("subreddit", subscription.Subreddit),
+			attribute.Int64("webhook.id", int64(subscription.WebhookID)),
+			attribute.Int64("guild.id", int64(subscription.GuildID)),
+			attribute.Int64("channel.id", int64(subscription.ChannelID)),
+		))
+	}
+
+	return nil
+}
+
+func (b *Bot) RemoveSubscription(webhookID snowflake.ID) error {
+	sub, err := b.DB.RemoveSubscription(webhookID)
+	if err != nil {
+		return err
+	}
+
+	if b.SubredditsCounter != nil {
+		b.SubredditsCounter.Add(context.Background(), -1, metric.WithAttributes(
+			attribute.String("subreddit", sub.Subreddit),
+			attribute.Int64("webhook.id", int64(sub.WebhookID)),
+			attribute.Int64("guild.id", int64(sub.GuildID)),
+			attribute.Int64("channel.id", int64(sub.ChannelID)),
+		))
+	}
+
+	return nil
+}
+
+func (b *Bot) RemoveSubscriptionByGuildSubreddit(guildID snowflake.ID, subreddit string, reason string) error {
+	sub, err := b.DB.RemoveSubscriptionByGuildSubreddit(guildID, subreddit)
+	if err != nil {
+		return err
+	}
+
+	_ = b.Client.Rest().DeleteWebhookWithToken(sub.WebhookID, sub.WebhookToken, rest.WithReason(reason))
+
+	if b.SubredditsCounter != nil {
+		b.SubredditsCounter.Add(context.Background(), -1, metric.WithAttributes(
+			attribute.String("subreddit", sub.Subreddit),
+			attribute.Int64("webhook.id", int64(sub.WebhookID)),
+			attribute.Int64("guild.id", int64(sub.GuildID)),
+			attribute.Int64("channel.id", int64(sub.ChannelID)),
+		))
+	}
+
+	return nil
+}
 
 func (b *Bot) ListenSubreddits() {
 	for {
@@ -68,7 +127,7 @@ func (b *Bot) checkSubreddit(subscription Subscription) {
 	if err != nil {
 		log.Error("error getting posts for subreddit %s: %s", subscription.Subreddit, err.Error())
 		if errors.Is(err, ErrSubredditNotFound) || errors.Is(err, ErrSubredditForbidden) {
-			if err = b.DB.RemoveSubscription(subscription.WebhookID); err != nil {
+			if err = b.RemoveSubscription(subscription.WebhookID); err != nil {
 				log.Error("error removing subscription for webhook %s: %s", subscription.WebhookID, err.Error())
 			}
 		}
@@ -87,7 +146,6 @@ func (b *Bot) checkSubreddit(subscription Subscription) {
 }
 
 func (b *Bot) sendPost(subscription Subscription, post RedditPost) {
-
 	embed := discord.Embed{
 		Title:       post.Title,
 		Description: html.UnescapeString(post.Selftext),
@@ -103,13 +161,27 @@ func (b *Bot) sendPost(subscription Subscription, post RedditPost) {
 		Timestamp: json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
 	}
 
+	if b.PostsSentGauge != nil {
+		b.PostsSentGauge.Add(context.Background(), 1, metric.WithAttributes(
+			attribute.String("subreddit", subscription.Subreddit),
+			attribute.Int64("webhook.id", int64(subscription.WebhookID)),
+			attribute.Int64("guild.id", int64(subscription.GuildID)),
+			attribute.Int64("channel.id", int64(subscription.ChannelID)),
+		))
+	}
+
+	if b.Cfg.TestMode {
+		log.Debug("sending post to webhook %d: %s", subscription.WebhookID, post.Title)
+		return
+	}
+
 	if _, err := b.Client.Rest().CreateWebhookMessage(subscription.WebhookID, subscription.WebhookToken, discord.WebhookMessageCreate{
 		AvatarURL: "https://www.redditstatic.com/desktop2x/img/favicon/android-icon-192x192.png",
 		Embeds:    []discord.Embed{embed},
 	}, false, 0); err != nil {
 		var restError rest.Error
 		if errors.Is(err, &restError) && restError.Response.StatusCode == http.StatusNotFound {
-			if err = b.DB.RemoveSubscription(subscription.WebhookID); err != nil {
+			if err = b.RemoveSubscription(subscription.WebhookID); err != nil {
 				log.Error("error removing subscription for webhook %s: %s", subscription.WebhookID, err.Error())
 			}
 			return

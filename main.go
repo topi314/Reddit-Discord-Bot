@@ -20,6 +20,9 @@ import (
 )
 
 var (
+	Name      = "reddit-discord-bot"
+	Namespace = "github.com/topi314/reddit-discord-bot"
+
 	Version = "unknown"
 	Commit  = "unknown"
 )
@@ -64,9 +67,15 @@ func main() {
 		log.Fatalf("error creating database client: %s", err.Error())
 	}
 
+	meter, err := newMeter(cfg.Otel)
+	if err != nil {
+		log.Fatalf("error creating meter: %s", err.Error())
+	}
+
 	b := redditbot.Bot{
 		Cfg:        cfg,
 		RedditIcon: redditIcon,
+		Meter:      meter,
 		Client:     client,
 		Reddit:     reddit,
 		DB:         db,
