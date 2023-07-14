@@ -41,8 +41,7 @@ func newMeter(cfg redditbot.OtelConfig) (metric.Meter, error) {
 	otel.SetMeterProvider(mp)
 
 	mux := http.NewServeMux()
-	mux.Handle(cfg.Metrics.ListenAddr, promhttp.Handler())
-
+	mux.Handle(cfg.Metrics.Endpoint, promhttp.Handler())
 	server := &http.Server{
 		Addr:    cfg.Metrics.ListenAddr,
 		Handler: mux,
