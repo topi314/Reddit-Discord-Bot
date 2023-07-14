@@ -97,6 +97,12 @@ func main() {
 		LastPosts: map[snowflake.ID]string{},
 	}
 
+	if cfg.Otel.Enabled {
+		if err = b.InitMetrics(); err != nil {
+			log.Fatal("error initializing metrics:", err.Error())
+		}
+	}
+
 	if cfg.Server.Enabled {
 		mux := http.NewServeMux()
 		mux.HandleFunc(cfg.Server.Endpoint, b.OnDiscordCallback)
