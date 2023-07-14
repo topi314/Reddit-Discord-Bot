@@ -39,13 +39,13 @@ func main() {
 	log.Infof("starting reddit-discord-bot version: %s (%s)", Version, Commit)
 	cfg, err := redditbot.ReadConfig()
 	if err != nil {
-		log.Fatalf("error reading config: %s", err.Error())
+		log.Fatal("error reading config:", err.Error())
 	}
 
 	log.SetLevel(cfg.Log.Level)
 	log.SetFlags(cfg.Log.Flags())
 
-	log.Infof("Config: %s\n", cfg)
+	log.Info("Config:", cfg)
 	if err = cfg.Validate(); err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -54,22 +54,22 @@ func main() {
 		bot.WithDefaultGateway(),
 	)
 	if err != nil {
-		log.Fatalf("error creating client: %s", err.Error())
+		log.Fatal("error creating client:", err.Error())
 	}
 
 	reddit, err := redditbot.NewReddit(cfg.Reddit)
 	if err != nil {
-		log.Fatalf("error creating reddit client: %s", err.Error())
+		log.Fatal("error creating reddit client:", err.Error())
 	}
 
 	db, err := redditbot.NewDB(cfg.Database, schema)
 	if err != nil {
-		log.Fatalf("error creating database client: %s", err.Error())
+		log.Fatal("error creating database client:", err.Error())
 	}
 
 	meter, err := newMeter(cfg.Otel)
 	if err != nil {
-		log.Fatalf("error creating meter: %s", err.Error())
+		log.Fatal("error creating meter:", err.Error())
 	}
 
 	b := redditbot.Bot{
@@ -109,13 +109,13 @@ func main() {
 	b.Client.AddEventListeners(bot.NewListenerFunc(b.OnApplicationCommand))
 
 	if _, err = client.Rest().SetGlobalCommands(client.ApplicationID(), redditbot.Commands); err != nil {
-		log.Fatalf("error setting global commands: %s", err.Error())
+		log.Fatal("error setting global commands:", err.Error())
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err = client.OpenGateway(ctx); err != nil {
-		log.Fatalf("error opening gateway: %s", err.Error())
+		log.Fatal("error opening gateway:", err.Error())
 	}
 
 	go b.ListenSubreddits()

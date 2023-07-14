@@ -47,6 +47,6 @@ func (b *Bot) randomString(length int) string {
 
 func (b *Bot) ListenAndServe() {
 	if err := b.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("error starting server: %s", err.Error())
+		log.Fatal("error starting server:", err.Error())
 	}
 }

@@ -55,7 +55,7 @@ func ReadConfig() (Config, error) {
 	}
 
 	k := koanf.New(".")
-	log.Infof("Loading config from: %s\n", *path)
+	log.Info("Loading config from:", *path)
 	if err := k.Load(file.Provider(*path), yaml.Parser()); err != nil {
 		return Config{}, err
 	}

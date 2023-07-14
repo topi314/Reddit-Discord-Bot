@@ -90,16 +90,16 @@ func (b *Bot) ListenSubreddits() {
 		now := time.Now()
 		subscriptions, err := b.DB.GetAllSubscriptions()
 		if err != nil {
-			log.Error("error getting subscriptions: %s", err.Error())
+			log.Error("error getting subscriptions:", err.Error())
 			continue
 		}
-		log.Debug("checking subreddits for %d subscriptions", len(subscriptions))
+		log.Debugf("checking subreddits for %d subscriptions", len(subscriptions))
 
 		for i := range subscriptions {
 			subNow := time.Now()
 			ok, err := b.DB.HasSubscription(subscriptions[i].WebhookID)
 			if err != nil {
-				log.Error("error checking subscription for webhook %s: %s", subscriptions[i].WebhookID, err.Error())
+				log.Errorf("error checking subscription for webhook %s: %s", subscriptions[i].WebhookID, err.Error())
 				continue
 			}
 			if !ok {
@@ -116,7 +116,7 @@ func (b *Bot) ListenSubreddits() {
 
 		duration := time.Now().Sub(now)
 		if duration > time.Duration(len(subscriptions))*WaitTime {
-			log.Debug("took %s too long to check %d subreddits", duration.String(), len(subscriptions))
+			log.Debugf("took %s too long to check %d subreddits", duration.String(), len(subscriptions))
 		}
 	}
 }
@@ -125,15 +125,15 @@ func (b *Bot) checkSubreddit(subscription Subscription) {
 	lastPost := b.LastPosts[subscription.WebhookID]
 	posts, before, err := b.Reddit.GetPosts(b.Reddit, subscription.Subreddit, lastPost)
 	if err != nil {
-		log.Error("error getting posts for subreddit %s: %s", subscription.Subreddit, err.Error())
+		log.Errorf("error getting posts for subreddit %s: %s", subscription.Subreddit, err.Error())
 		if errors.Is(err, ErrSubredditNotFound) || errors.Is(err, ErrSubredditForbidden) {
 			if err = b.RemoveSubscription(subscription.WebhookID); err != nil {
-				log.Error("error removing subscription for webhook %s: %s", subscription.WebhookID, err.Error())
+				log.Errorf("error removing subscription for webhook %s: %s", subscription.WebhookID, err.Error())
 			}
 		}
 		return
 	}
-	log.Debug("got %d posts for subreddit %s before: %v\n", len(posts), subscription.Subreddit, before)
+	log.Debugf("got %d posts for subreddit %s before: %v\n", len(posts), subscription.Subreddit, before)
 
 	if lastPost != "" {
 		for i := len(posts) - 1; i >= 0; i-- {
@@ -171,7 +171,7 @@ func (b *Bot) sendPost(subscription Subscription, post RedditPost) {
 	}
 
 	if b.Cfg.TestMode {
-		log.Debug("sending post to webhook %d: %s", subscription.WebhookID, post.Title)
+		log.Debugf("sending post to webhook %d: %s", subscription.WebhookID, post.Title)
 		return
 	}
 
@@ -182,11 +182,11 @@ func (b *Bot) sendPost(subscription Subscription, post RedditPost) {
 		var restError rest.Error
 		if errors.Is(err, &restError) && restError.Response.StatusCode == http.StatusNotFound {
 			if err = b.RemoveSubscription(subscription.WebhookID); err != nil {
-				log.Error("error removing subscription for webhook %s: %s", subscription.WebhookID, err.Error())
+				log.Errorf("error removing subscription for webhook %s: %s", subscription.WebhookID, err.Error())
 			}
 			return
 		}
-		log.Error("error sending post to webhook %d: %s", subscription.WebhookID, err.Error())
+		log.Errorf("error sending post to webhook %d: %s", subscription.WebhookID, err.Error())
 	}
 }
 
