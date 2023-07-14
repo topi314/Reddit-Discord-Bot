@@ -74,7 +74,7 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	log.Debug("rate limit: used: %d, remaining: %d, reset: %s\n", r.rateLimit.used, r.rateLimit.remaining, r.rateLimit.reset.Format(time.RFC3339))
+	log.Debugf("rate limit: used: %d, remaining: %d, reset: %s\n", r.rateLimit.used, r.rateLimit.remaining, r.rateLimit.reset.Format(time.RFC3339))
 
 	now := time.Now()
 	limit := 10
@@ -103,15 +103,15 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 	headers := rs.Header
 	used, err := strconv.ParseFloat(headers.Get("X-Ratelimit-Used"), 64)
 	if err != nil {
-		log.Error("error parsing x-ratelimit-used: %s", err.Error())
+		log.Error("error parsing x-ratelimit-used:", err.Error())
 	}
 	remaining, err := strconv.ParseFloat(headers.Get("X-Ratelimit-Remaining"), 64)
 	if err != nil {
-		log.Error("error parsing x-ratelimit-remaining: %s", err.Error())
+		log.Error("error parsing x-ratelimit-remaining:", err.Error())
 	}
 	reset, err := strconv.ParseFloat(headers.Get("X-Ratelimit-Reset"), 64)
 	if err != nil {
-		log.Error("error parsing x-ratelimit-reset: %s", err.Error())
+		log.Error("error parsing x-ratelimit-reset:", err.Error())
 	}
 
 	r.rateLimit = rateLimit{
@@ -163,7 +163,7 @@ func (r *Reddit) GetPosts(client *Reddit, subreddit string, lastPost string) ([]
 	if lastPost != "" {
 		url += fmt.Sprintf("&before=%s", lastPost)
 	}
-	log.Debug("getting posts for url: %s", url)
+	log.Debug("getting posts for url:", url)
 	rq, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, "", err
