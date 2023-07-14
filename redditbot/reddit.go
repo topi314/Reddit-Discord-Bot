@@ -10,9 +10,7 @@ import (
 
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/log"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
-
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/oauth2"
 )
 
@@ -47,8 +45,6 @@ type rateLimit struct {
 type Reddit struct {
 	config *oauth2.Config
 	client *http.Client
-
-	counter metric.Int64Counter
 
 	rateLimit rateLimit
 	token     *oauth2.Token
@@ -120,18 +116,16 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 		reset:     now.Add(time.Second * time.Duration(reset)),
 	}
 
-	if r.counter != nil {
-		r.counter.Add(context.Background(), 1, metric.WithAttributes(
-			attribute.String("path", rq.URL.Path),
-			attribute.String("method", rq.Method),
-			attribute.Int("status", rs.StatusCode),
-			attribute.Int64("sleep", int64(sleep)),
-			attribute.Int("used", r.rateLimit.used),
-			attribute.Int("remaining", r.rateLimit.remaining),
-			attribute.Int64("reset", r.rateLimit.reset.Unix()),
-			attribute.Bool("important", important),
-		))
-	}
+	redditRequests.With(prometheus.Labels{
+		"path":      rq.URL.Path,
+		"method":    rq.Method,
+		"status":    strconv.Itoa(rs.StatusCode),
+		"important": strconv.FormatBool(important),
+		"sleep":     strconv.FormatInt(int64(sleep), 10),
+		"used":      strconv.Itoa(r.rateLimit.used),
+		"remaining": strconv.Itoa(r.rateLimit.remaining),
+		"reset":     strconv.FormatInt(r.rateLimit.reset.Unix(), 10),
+	}).Inc()
 
 	return rs, nil
 }

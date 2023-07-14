@@ -8,11 +8,27 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/log"
 	"github.com/disgoorg/snowflake/v2"
-	"go.opentelemetry.io/otel/metric"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/oauth2"
 )
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+var postsSent = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "redditbot_posts_sent",
+	Help: "The number of posts sent to Discord",
+}, []string{"subreddit", "webhook_id", "guild_id", "channel_id"})
+
+var subreddits = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "redditbot_subreddits",
+	Help: "The number of subreddits being monitored",
+}, []string{"subreddit", "webhook_id", "guild_id", "channel_id"})
+
+var redditRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "redditbot_reddit_requests",
+	Help: "The number of requests made to the Reddit API",
+}, []string{"path", "method", "status", "important", "sleep", "used", "remaining", "reset"})
 
 type SetupState struct {
 	Subreddit   string
@@ -22,19 +38,16 @@ type SetupState struct {
 type Bot struct {
 	Cfg           Config
 	RedditIcon    []byte
-	Meter         metric.Meter
 	Client        bot.Client
 	Reddit        *Reddit
 	DB            *DB
 	Server        *http.Server
+	MetricsServer *http.Server
 	DiscordConfig *oauth2.Config
 	Rand          *rand.Rand
 
 	States    map[string]SetupState
 	LastPosts map[snowflake.ID]string
-
-	PostsSentGauge    metric.Int64Counter
-	SubredditsCounter metric.Int64UpDownCounter
 }
 
 func (b *Bot) randomString(length int) string {
@@ -47,6 +60,12 @@ func (b *Bot) randomString(length int) string {
 
 func (b *Bot) ListenAndServe() {
 	if err := b.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal("error starting server:", err.Error())
+	}
+}
+
+func (b *Bot) ListenAndServeMetrics() {
+	if err := b.MetricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal("error starting server:", err.Error())
 	}
 }

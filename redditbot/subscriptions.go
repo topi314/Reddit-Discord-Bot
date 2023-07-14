@@ -1,20 +1,18 @@
 package redditbot
 
 import (
-	"context"
 	"errors"
 	"html"
 	"net/http"
+	"strconv"
 	"time"
-
-	"github.com/disgoorg/log"
-	"github.com/disgoorg/snowflake/v2"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
+	"github.com/disgoorg/log"
+	"github.com/disgoorg/snowflake/v2"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -30,19 +28,17 @@ var (
 	ErrSubredditForbidden = errors.New("subreddit forbidden")
 )
 
-func (b *Bot) AddSubscription(subscription Subscription) error {
-	if err := b.DB.AddSubscription(subscription); err != nil {
+func (b *Bot) AddSubscription(sub Subscription) error {
+	if err := b.DB.AddSubscription(sub); err != nil {
 		return err
 	}
 
-	if b.SubredditsCounter != nil {
-		b.SubredditsCounter.Add(context.Background(), 1, metric.WithAttributes(
-			attribute.String("subreddit", subscription.Subreddit),
-			attribute.Int64("webhook.id", int64(subscription.WebhookID)),
-			attribute.Int64("guild.id", int64(subscription.GuildID)),
-			attribute.Int64("channel.id", int64(subscription.ChannelID)),
-		))
-	}
+	subreddits.With(prometheus.Labels{
+		"subreddit":  sub.Subreddit,
+		"webhook_id": strconv.FormatInt(int64(sub.WebhookID), 10),
+		"guild_id":   strconv.FormatInt(int64(sub.GuildID), 10),
+		"channel_id": strconv.FormatInt(int64(sub.ChannelID), 10),
+	}).Inc()
 
 	return nil
 }
@@ -53,14 +49,12 @@ func (b *Bot) RemoveSubscription(webhookID snowflake.ID) error {
 		return err
 	}
 
-	if b.SubredditsCounter != nil {
-		b.SubredditsCounter.Add(context.Background(), -1, metric.WithAttributes(
-			attribute.String("subreddit", sub.Subreddit),
-			attribute.Int64("webhook.id", int64(sub.WebhookID)),
-			attribute.Int64("guild.id", int64(sub.GuildID)),
-			attribute.Int64("channel.id", int64(sub.ChannelID)),
-		))
-	}
+	subreddits.With(prometheus.Labels{
+		"subreddit":  sub.Subreddit,
+		"webhook_id": strconv.FormatInt(int64(sub.WebhookID), 10),
+		"guild_id":   strconv.FormatInt(int64(sub.GuildID), 10),
+		"channel_id": strconv.FormatInt(int64(sub.ChannelID), 10),
+	}).Dec()
 
 	return nil
 }
@@ -73,14 +67,12 @@ func (b *Bot) RemoveSubscriptionByGuildSubreddit(guildID snowflake.ID, subreddit
 
 	_ = b.Client.Rest().DeleteWebhookWithToken(sub.WebhookID, sub.WebhookToken, rest.WithReason(reason))
 
-	if b.SubredditsCounter != nil {
-		b.SubredditsCounter.Add(context.Background(), -1, metric.WithAttributes(
-			attribute.String("subreddit", sub.Subreddit),
-			attribute.Int64("webhook.id", int64(sub.WebhookID)),
-			attribute.Int64("guild.id", int64(sub.GuildID)),
-			attribute.Int64("channel.id", int64(sub.ChannelID)),
-		))
-	}
+	subreddits.With(prometheus.Labels{
+		"subreddit":  sub.Subreddit,
+		"webhook_id": strconv.FormatInt(int64(sub.WebhookID), 10),
+		"guild_id":   strconv.FormatInt(int64(sub.GuildID), 10),
+		"channel_id": strconv.FormatInt(int64(sub.ChannelID), 10),
+	}).Dec()
 
 	return nil
 }
@@ -161,14 +153,12 @@ func (b *Bot) sendPost(subscription Subscription, post RedditPost) {
 		Timestamp: json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
 	}
 
-	if b.PostsSentGauge != nil {
-		b.PostsSentGauge.Add(context.Background(), 1, metric.WithAttributes(
-			attribute.String("subreddit", subscription.Subreddit),
-			attribute.Int64("webhook.id", int64(subscription.WebhookID)),
-			attribute.Int64("guild.id", int64(subscription.GuildID)),
-			attribute.Int64("channel.id", int64(subscription.ChannelID)),
-		))
-	}
+	postsSent.With(prometheus.Labels{
+		"subreddit":  subscription.Subreddit,
+		"webhook.id": strconv.FormatUint(uint64(subscription.WebhookID), 10),
+		"guild.id":   strconv.FormatUint(uint64(subscription.GuildID), 10),
+		"channel.id": strconv.FormatUint(uint64(subscription.ChannelID), 10),
+	}).Inc()
 
 	if b.Cfg.TestMode {
 		log.Debugf("sending post to webhook %d: %s", subscription.WebhookID, post.Title)

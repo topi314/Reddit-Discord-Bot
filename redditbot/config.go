@@ -82,18 +82,18 @@ type Config struct {
 	Discord  DiscordConfig  `koanf:"discord"`
 	Reddit   RedditConfig   `koanf:"reddit"`
 	Database DatabaseConfig `koanf:"database"`
-	Otel     OtelConfig     `koanf:"otel"`
+	Metrics  MetricsConfig  `koanf:"metrics"`
 }
 
 func (c Config) String() string {
-	return fmt.Sprintf("\nTestMode: %t\nLog: %s\nServer: %s\nDiscord: %s\nReddit: %v\nDatabase: %s\nOtel: %s",
+	return fmt.Sprintf("\nTestMode: %t\nLog: %s\nServer: %s\nDiscord: %s\nReddit: %v\nDatabase: %s\nMetrics: %s",
 		c.TestMode,
 		c.Log,
 		c.Server,
 		c.Discord,
 		c.Reddit,
 		c.Database,
-		c.Otel,
+		c.Metrics,
 	)
 }
 
@@ -325,48 +325,29 @@ func (c SQLiteConfig) DataSourceName() string {
 	return c.Path
 }
 
-type OtelConfig struct {
-	Enabled    bool          `koanf:"enabled"`
-	InstanceID string        `koanf:"instance_id"`
-	Metrics    MetricsConfig `koanf:"metrics"`
-}
-
-func (c OtelConfig) String() string {
-	return fmt.Sprintf("\n  Enabled: %v\n  InstanceID: %v\n  Metrics: %v",
-		c.Enabled,
-		c.InstanceID,
-		c.Metrics,
-	)
-}
-
-func (c OtelConfig) Validate() error {
-	if !c.Enabled {
-		return nil
-	}
-	if c.InstanceID == "" {
-		return fmt.Errorf("otel.instance_id must be set")
-	}
-	return c.Metrics.Validate()
-}
-
 type MetricsConfig struct {
+	Enabled    bool   `koanf:"enabled"`
 	ListenAddr string `koanf:"listen_addr"`
 	Endpoint   string `koanf:"endpoint"`
 }
 
 func (c MetricsConfig) String() string {
-	return fmt.Sprintf("\n   ListenAddr: %v\n   Endpoint: %v",
+	return fmt.Sprintf("\n Enabled: %v\n ListenAddr: %v\n Endpoint: %v",
+		c.Enabled,
 		c.ListenAddr,
 		c.Endpoint,
 	)
 }
 
 func (c MetricsConfig) Validate() error {
+	if !c.Enabled {
+		return nil
+	}
 	if c.ListenAddr == "" {
-		return fmt.Errorf("otel.metrics.listen_addr must be set")
+		return fmt.Errorf("metrics.listen_addr must be set")
 	}
 	if c.Endpoint == "" {
-		return fmt.Errorf("otel.metrics.endpoint must be set")
+		return fmt.Errorf("metrics.endpoint must be set")
 	}
 	return nil
 }

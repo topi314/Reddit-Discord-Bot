@@ -15,6 +15,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/log"
 	"github.com/disgoorg/snowflake/v2"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/topi314/reddit-discord-bot/redditbot"
 	"golang.org/x/oauth2"
 )
@@ -67,15 +68,9 @@ func main() {
 		log.Fatal("error creating database client:", err.Error())
 	}
 
-	meter, err := newMeter(cfg.Otel)
-	if err != nil {
-		log.Fatal("error creating meter:", err.Error())
-	}
-
 	b := redditbot.Bot{
 		Cfg:        cfg,
 		RedditIcon: redditIcon,
-		Meter:      meter,
 		Client:     client,
 		Reddit:     reddit,
 		DB:         db,
@@ -97,9 +92,12 @@ func main() {
 		LastPosts: map[snowflake.ID]string{},
 	}
 
-	if cfg.Otel.Enabled {
-		if err = b.InitMetrics(); err != nil {
-			log.Fatal("error initializing metrics:", err.Error())
+	if cfg.Metrics.Enabled {
+		mux := http.NewServeMux()
+		mux.Handle(cfg.Metrics.Endpoint, promhttp.Handler())
+		b.MetricsServer = &http.Server{
+			Addr:    cfg.Metrics.ListenAddr,
+			Handler: mux,
 		}
 	}
 
@@ -129,6 +127,11 @@ func main() {
 	if cfg.Server.Enabled {
 		go b.ListenAndServe()
 		defer b.Server.Shutdown(context.Background())
+	}
+
+	if cfg.Metrics.Enabled {
+		go b.ListenAndServeMetrics()
+		defer b.MetricsServer.Shutdown(context.Background())
 	}
 
 	defer log.Info("exiting...")
