@@ -109,7 +109,7 @@ version: "3.8"
 
 services:
   reddit-bot:
-    image: ghcr.io/topi314/reddit-discord-bot:master
+    image: ghcr.io/topi314/reddit-discord-bot:v2
     container_name: reddit-bot
     restart: unless-stopped
     volumes:

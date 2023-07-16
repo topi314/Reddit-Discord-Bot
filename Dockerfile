@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 \
     GOOS=$TARGETOS \
     GOARCH=$TARGETARCH \
-    go build -ldflags="-X 'main.Version=$VERSION' -X 'main.Commit=$COMMIT'" -o reddit-discord-bot github.com/topi314/reddit-discord-bot
+    go build -ldflags="-X 'main.Version=$VERSION' -X 'main.Commit=$COMMIT'" -o reddit-discord-bot github.com/topi314/reddit-discord-bot/v2
 
 FROM alpine
 
