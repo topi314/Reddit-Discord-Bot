@@ -1,0 +1,63 @@
+name: Binary Release
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [ linux, windows, darwin ]
+        goarch: [ amd64, 386, arm, arm64 ]
+        exclude:
+          - goos: darwin
+            goarch: 386
+          - goos: darwin
+            goarch: arm
+          - goos: windows
+            goarch: arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.20.x
+          cache: true
+
+      - name: File Extension Windows
+        if: ${{ matrix.goos == 'windows' }}
+        run: echo "file_extension=.exe" >> $GITHUB_ENV
+
+      - name: Prepare Version Info
+        run: |
+          echo "VERSION=$(git describe --tags)" >> $GITHUB_ENV
+          echo "COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Build
+        run: |
+          CGO_ENABLED=0
+          GOOS=${{ matrix.goos }}
+          GOARCH=${{ matrix.goarch }}
+          go build -ldflags "-X main.Version=${{ env.VERSION }} -X main.Commit=${{ env.COMMIT }}" -o reddit-discord-bot-${{ matrix.goos }}-${{ matrix.goarch }}${{ env.file_name }} github.com/topi314/reddit-discord-bot
+
+      - name: Upload
+        uses: actions/upload-artifact@v2
+        with:
+          name: reddit-discord-bot ${{ matrix.goos }} ${{ matrix.goarch }}
+          path: reddit-discord-bot-*
+
+      - name: Release
+        if: ${{ github.event_name == 'release' }}
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: reddit-discord-bot-*
+          allowUpdates: true
+          omitBodyDuringUpdate: true
+          omitDraftDuringUpdate: true
+          omitNameDuringUpdate: true
+          omitPrereleaseDuringUpdate: true

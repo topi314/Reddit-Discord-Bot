@@ -1,6 +1,7 @@
-.editorconfig
+.github/
+.gitignore
 README.md
 LICENSE
 Dockerfile
-conf.env
-conf.env.example
+config.json
+config.example.yml

@@ -1,0 +1,43 @@
+# if test_mode is true, the bot will not post to discord and instead log all posts which would have been made
+test_mode: false
+
+log:
+  # 0: trace, 1: debug, 2: info, 3: warn, 4: error, 5: fatal, 6: panic
+  level: 2
+  add_source: true
+
+# disable the server if you don't want to rely on an oauth2 flow to create the webhook
+server:
+  enabled: true
+  listen_addr: :8080
+  endpoint: /callback/discord
+  redirect_url: https://example.com/callback/discord
+
+discord:
+  token: ...
+  client_secret: ...
+  sync_commands: true
+
+reddit:
+  client_id: ...
+  client_secret: ...
+  requests_per_minute: 59
+
+database:
+  type: sqlite
+  postgres:
+    host: localhost
+    port: 5432
+    username: postgres
+    password: postgres
+    database: postgres
+    ssl_mode: disable
+  sqlite:
+    path: ./database.db
+
+otel:
+  enabled: false
+  instance_id: 01
+  metrics:
+    listen_addr: :8081
+    endpoint: /metrics
