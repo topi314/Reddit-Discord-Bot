@@ -16,6 +16,7 @@ var (
 
 type Subscription struct {
 	Subreddit    string       `db:"subreddit"`
+	Type         string       `db:"type"`
 	GuildID      snowflake.ID `db:"guild_id"`
 	ChannelID    snowflake.ID `db:"channel_id"`
 	WebhookID    snowflake.ID `db:"webhook_id"`
@@ -96,6 +97,12 @@ func (d *DB) GetAllSubscriptions() ([]Subscription, error) {
 func (d *DB) HasSubscription(webhookID snowflake.ID) (bool, error) {
 	var count int
 	err := d.dbx.Get(&count, `SELECT COUNT(*) FROM subscriptions WHERE webhook_id = $1`, webhookID)
+	return count > 0, err
+}
+
+func (d *DB) HasSubscriptionByGuildSubreddit(guildID snowflake.ID, subreddit string) (bool, error) {
+	var count int
+	err := d.dbx.Get(&count, `SELECT COUNT(*) FROM subscriptions WHERE guild_id = $1 AND subreddit = $2`, guildID, subreddit)
 	return count > 0, err
 }
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
@@ -13,7 +14,7 @@ import (
 
 var Commands = []discord.ApplicationCommandCreate{
 	discord.SlashCommandCreate{
-		Name:        "subreddit",
+		Name:        "reddit",
 		Description: "manage your subscribed subreddits",
 		Options: []discord.ApplicationCommandOption{
 			discord.ApplicationCommandOptionSubCommand{
@@ -24,6 +25,29 @@ var Commands = []discord.ApplicationCommandCreate{
 						Name:        "subreddit",
 						Description: "the subreddit to add",
 						Required:    true,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "type",
+						Description: "the type of posts to send",
+						Required:    false,
+						Choices: []discord.ApplicationCommandOptionChoiceString{
+							{
+								Name:  "New",
+								Value: "new",
+							},
+							{
+								Name:  "Hot",
+								Value: "hot",
+							},
+							{
+								Name:  "Top",
+								Value: "top",
+							},
+							{
+								Name:  "Rising",
+								Value: "rising",
+							},
+						},
 					},
 				},
 			},
@@ -60,7 +84,7 @@ var Commands = []discord.ApplicationCommandCreate{
 func (b *Bot) OnApplicationCommand(event *events.ApplicationCommandInteractionCreate) {
 	data := event.SlashCommandInteractionData()
 	switch data.CommandName() {
-	case "subreddit":
+	case "reddit":
 		switch *data.SubCommandName {
 		case "add":
 			b.OnSubredditAdd(data, event)
@@ -76,8 +100,28 @@ func (b *Bot) OnApplicationCommand(event *events.ApplicationCommandInteractionCr
 
 func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *events.ApplicationCommandInteractionCreate) {
 	subreddit := data.String("subreddit")
+	postType, ok := data.OptString("type")
+	if !ok {
+		postType = "new"
+	}
 
-	if err := b.Reddit.CheckSubreddit(subreddit); err != nil {
+	ok, err := b.DB.HasSubscriptionByGuildSubreddit(*event.GuildID(), subreddit)
+	if err != nil {
+		_ = event.CreateMessage(discord.MessageCreate{
+			Content: "Failed to check if you are already subscribed to this subreddit: " + err.Error(),
+			Flags:   discord.MessageFlagEphemeral,
+		})
+		return
+	}
+	if ok {
+		_ = event.CreateMessage(discord.MessageCreate{
+			Content: fmt.Sprintf("You are already subscribed to r/%s", subreddit),
+			Flags:   discord.MessageFlagEphemeral,
+		})
+		return
+	}
+
+	if err = b.Reddit.CheckSubreddit(subreddit); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Invalid subreddit: " + err.Error(),
 			Flags:   discord.MessageFlagEphemeral,
@@ -117,8 +161,19 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		return
 	}
 
+	if _, err = b.Client.Rest().CreateWebhookMessage(webhook.ID(), webhook.Token, discord.WebhookMessageCreate{
+		Content: fmt.Sprintf("Added subscription for [r/%s](https://reddit.com/r/%s)", subreddit, subreddit),
+	}, true, 0); err != nil {
+		_ = event.CreateMessage(discord.MessageCreate{
+			Content: "Failed to send test message to webhook: " + err.Error(),
+			Flags:   discord.MessageFlagEphemeral,
+		})
+		return
+	}
+
 	if err = b.DB.AddSubscription(Subscription{
 		Subreddit:    subreddit,
+		Type:         postType,
 		GuildID:      *event.GuildID(),
 		ChannelID:    event.Channel().ID(),
 		WebhookID:    webhook.ID(),
@@ -129,15 +184,6 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 			Flags:   discord.MessageFlagEphemeral,
 		})
 		return
-	}
-
-	if _, err = b.Client.Rest().CreateWebhookMessage(webhook.ID(), webhook.Token, discord.WebhookMessageCreate{
-		Content: fmt.Sprintf("Added subscription for [r/%s](https://reddit.com/r/%s)", subreddit, subreddit),
-	}, true, 0); err != nil {
-		_ = event.CreateMessage(discord.MessageCreate{
-			Content: "Failed to send test message to webhook: " + err.Error(),
-			Flags:   discord.MessageFlagEphemeral,
-		})
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{
@@ -189,9 +235,9 @@ func (b *Bot) OnSubredditList(data discord.SlashCommandInteractionData, event *e
 		return
 	}
 
-	content := fmt.Sprintf("**Subscriptions(%d):**\n", len(subs))
+	content := fmt.Sprintf("# Subscriptions(%d):\n", len(subs))
 	for _, sub := range subs {
-		content += fmt.Sprintf("- %s\n", sub.Subreddit)
+		content += fmt.Sprintf("- `%s` - [r/%s](https://reddit.com/r/%s)\n", strings.Title(sub.Type), sub.Subreddit, sub.Subreddit)
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{

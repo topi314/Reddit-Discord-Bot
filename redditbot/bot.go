@@ -1,6 +1,7 @@
 package redditbot
 
 import (
+	"context"
 	"math/rand"
 	"net/http"
 
@@ -18,12 +19,12 @@ const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 var postsSent = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "redditbot_posts_sent",
 	Help: "The number of posts sent to Discord",
-}, []string{"subreddit", "webhook_id", "guild_id", "channel_id"})
+}, []string{"subreddit", "type", "webhook_id", "guild_id", "channel_id"})
 
 var subreddits = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "redditbot_subreddits",
 	Help: "The number of subreddits being monitored",
-}, []string{"subreddit", "webhook_id", "guild_id", "channel_id"})
+}, []string{"subreddit", "type", "webhook_id", "guild_id", "channel_id"})
 
 var redditRequests = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "redditbot_reddit_requests",
@@ -67,5 +68,14 @@ func (b *Bot) ListenAndServe() {
 func (b *Bot) ListenAndServeMetrics() {
 	if err := b.MetricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal("error starting server:", err.Error())
+	}
+}
+
+func (b *Bot) Close() {
+	b.Client.Close(context.Background())
+	_ = b.DB.Close()
+	_ = b.Server.Shutdown(context.Background())
+	if b.MetricsServer != nil {
+		_ = b.MetricsServer.Shutdown(context.Background())
 	}
 }

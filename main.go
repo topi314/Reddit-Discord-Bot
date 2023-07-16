@@ -29,7 +29,7 @@ var (
 )
 
 var (
-	//go:embed schema.sql
+	//go:embed sql/schema.sql
 	schema string
 
 	//go:embed reddit.png
@@ -91,6 +91,7 @@ func main() {
 		States:    map[string]redditbot.SetupState{},
 		LastPosts: map[snowflake.ID]string{},
 	}
+	defer b.Close()
 
 	if cfg.Metrics.Enabled {
 		mux := http.NewServeMux()
@@ -112,8 +113,10 @@ func main() {
 
 	b.Client.AddEventListeners(bot.NewListenerFunc(b.OnApplicationCommand))
 
-	if _, err = client.Rest().SetGlobalCommands(client.ApplicationID(), redditbot.Commands); err != nil {
-		log.Fatal("error setting global commands:", err.Error())
+	if cfg.Discord.SyncCommands {
+		if _, err = client.Rest().SetGlobalCommands(client.ApplicationID(), redditbot.Commands); err != nil {
+			log.Fatal("error setting global commands:", err.Error())
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

@@ -143,17 +143,26 @@ func (r *Reddit) CheckSubreddit(subreddit string) error {
 	}
 	defer rs.Body.Close()
 
-	if rs.StatusCode == http.StatusNotFound {
+	if rs.StatusCode == http.StatusNotFound || rs.StatusCode == http.StatusBadRequest {
 		return ErrSubredditNotFound
 	} else if rs.StatusCode == http.StatusForbidden {
 		return ErrSubredditForbidden
 	}
 
+	var response RedditResponse
+	if err = json.NewDecoder(rs.Body).Decode(&response); err != nil {
+		return err
+	}
+
+	if len(response.Data.Children) == 0 {
+		return ErrSubredditNotFound
+	}
+
 	return nil
 }
 
-func (r *Reddit) GetPosts(client *Reddit, subreddit string, lastPost string) ([]RedditPost, string, error) {
-	url := fmt.Sprintf("https://oauth.reddit.com/r/%s/new.json?raw_json=1&limit=100", subreddit)
+func (r *Reddit) GetPosts(client *Reddit, subreddit string, fetchType string, lastPost string) ([]RedditPost, string, error) {
+	url := fmt.Sprintf("https://oauth.reddit.com/r/%s/%s.json?raw_json=1&limit=100", subreddit, fetchType)
 	if lastPost != "" {
 		url += fmt.Sprintf("&before=%s", lastPost)
 	}
@@ -188,7 +197,7 @@ func (r *Reddit) GetPosts(client *Reddit, subreddit string, lastPost string) ([]
 
 	if response.Data.Before != "" {
 		var morePosts []RedditPost
-		morePosts, before, err = r.GetPosts(client, subreddit, before)
+		morePosts, before, err = r.GetPosts(client, subreddit, fetchType, before)
 		if err != nil {
 			return nil, "", err
 		}
@@ -200,4 +209,26 @@ func (r *Reddit) GetPosts(client *Reddit, subreddit string, lastPost string) ([]
 	}
 
 	return posts, before, nil
+}
+
+type RedditResponse struct {
+	Data struct {
+		Before   string `json:"before"`
+		Children []struct {
+			Data RedditPost `json:"data"`
+		} `json:"children"`
+	} `json:"data"`
+}
+
+type RedditPost struct {
+	Selftext              string  `json:"selftext"`
+	AuthorFullname        string  `json:"author_fullname"`
+	Title                 string  `json:"title"`
+	SubredditNamePrefixed string  `json:"subreddit_name_prefixed"`
+	ID                    string  `json:"id"`
+	Name                  string  `json:"name"`
+	Author                string  `json:"author"`
+	URL                   string  `json:"url"`
+	Permalink             string  `json:"permalink"`
+	CreatedUtc            float64 `json:"created_utc"`
 }

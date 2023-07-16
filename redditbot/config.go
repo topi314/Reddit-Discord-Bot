@@ -30,6 +30,7 @@ func ReadConfig() (Config, error) {
 
 	f.String("discord.token", "", "Discord bot token")
 	f.String("discord.client_secret", "", "Discord client secret")
+	f.Bool("discord.sync_commands", true, "Sync Discord commands (default: true)")
 
 	f.String("reddit.client_id", "", "Reddit client ID")
 	f.String("reddit.client_secret", "", "Reddit client secret")
@@ -178,12 +179,14 @@ func (c ServerConfig) Validate() error {
 type DiscordConfig struct {
 	Token        string `koanf:"token"`
 	ClientSecret string `koanf:"client_secret"`
+	SyncCommands bool   `koanf:"sync_commands"`
 }
 
 func (c DiscordConfig) String() string {
-	return fmt.Sprintf("\n  Token: %v\n  ClientSecret: %v",
+	return fmt.Sprintf("\n  Token: %s\n  ClientSecret: %s\n  SyncCommands: %t",
 		strings.Repeat("*", len(c.Token)),
 		strings.Repeat("*", len(c.ClientSecret)),
+		c.SyncCommands,
 	)
 }
 

@@ -2,9 +2,12 @@ package redditbot
 
 import (
 	"errors"
+	"fmt"
 	"html"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/disgoorg/disgo/discord"
@@ -28,6 +31,8 @@ var (
 	ErrSubredditForbidden = errors.New("subreddit forbidden")
 )
 
+var imageRegex = regexp.MustCompile(`https://.*\.(?:jpg|gif|png)`)
+
 func (b *Bot) AddSubscription(sub Subscription) error {
 	if err := b.DB.AddSubscription(sub); err != nil {
 		return err
@@ -35,6 +40,7 @@ func (b *Bot) AddSubscription(sub Subscription) error {
 
 	subreddits.With(prometheus.Labels{
 		"subreddit":  sub.Subreddit,
+		"type":       sub.Type,
 		"webhook_id": strconv.FormatInt(int64(sub.WebhookID), 10),
 		"guild_id":   strconv.FormatInt(int64(sub.GuildID), 10),
 		"channel_id": strconv.FormatInt(int64(sub.ChannelID), 10),
@@ -51,6 +57,7 @@ func (b *Bot) RemoveSubscription(webhookID snowflake.ID) error {
 
 	subreddits.With(prometheus.Labels{
 		"subreddit":  sub.Subreddit,
+		"type":       sub.Type,
 		"webhook_id": strconv.FormatInt(int64(sub.WebhookID), 10),
 		"guild_id":   strconv.FormatInt(int64(sub.GuildID), 10),
 		"channel_id": strconv.FormatInt(int64(sub.ChannelID), 10),
@@ -69,6 +76,7 @@ func (b *Bot) RemoveSubscriptionByGuildSubreddit(guildID snowflake.ID, subreddit
 
 	subreddits.With(prometheus.Labels{
 		"subreddit":  sub.Subreddit,
+		"type":       sub.Type,
 		"webhook_id": strconv.FormatInt(int64(sub.WebhookID), 10),
 		"guild_id":   strconv.FormatInt(int64(sub.GuildID), 10),
 		"channel_id": strconv.FormatInt(int64(sub.ChannelID), 10),
@@ -113,91 +121,81 @@ func (b *Bot) ListenSubreddits() {
 	}
 }
 
-func (b *Bot) checkSubreddit(subscription Subscription) {
-	lastPost := b.LastPosts[subscription.WebhookID]
-	posts, before, err := b.Reddit.GetPosts(b.Reddit, subscription.Subreddit, lastPost)
+func (b *Bot) checkSubreddit(sub Subscription) {
+	lastPost := b.LastPosts[sub.WebhookID]
+	posts, before, err := b.Reddit.GetPosts(b.Reddit, sub.Subreddit, sub.Type, lastPost)
 	if err != nil {
-		log.Errorf("error getting posts for subreddit %s: %s", subscription.Subreddit, err.Error())
+		log.Errorf("error getting posts for subreddit %s: %s", sub.Subreddit, err.Error())
 		if errors.Is(err, ErrSubredditNotFound) || errors.Is(err, ErrSubredditForbidden) {
-			if err = b.RemoveSubscription(subscription.WebhookID); err != nil {
-				log.Errorf("error removing subscription for webhook %s: %s", subscription.WebhookID, err.Error())
+			if err = b.RemoveSubscription(sub.WebhookID); err != nil {
+				log.Errorf("error removing sub for webhook %s: %s", sub.WebhookID, err.Error())
 			}
 		}
 		return
 	}
-	log.Debugf("got %d posts for subreddit %s before: %v\n", len(posts), subscription.Subreddit, before)
+	log.Debugf("got %d posts for subreddit %s before: %v\n", len(posts), sub.Subreddit, before)
 
 	if lastPost != "" {
 		for i := len(posts) - 1; i >= 0; i-- {
-			b.sendPost(subscription, posts[i])
+			b.sendPost(sub, posts[i])
 		}
 	}
 	if before != "" {
-		b.LastPosts[subscription.WebhookID] = before
+		b.LastPosts[sub.WebhookID] = before
 	}
 }
 
-func (b *Bot) sendPost(subscription Subscription, post RedditPost) {
+func (b *Bot) sendPost(sub Subscription, post RedditPost) {
 	embed := discord.Embed{
-		Title:       post.Title,
-		Description: html.UnescapeString(post.Selftext),
+		Title:       cutString(post.Title, 256),
+		Description: cutString(html.UnescapeString(post.Selftext), 4069),
 		URL:         "https://reddit.com" + post.Permalink,
+		Timestamp:   json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
+		Color:       0xff581a,
 		Author: &discord.EmbedAuthor{
-			Name:    "new post in " + post.SubredditNamePrefixed,
+			Name:    fmt.Sprintf("%s post in %s", strings.Title(sub.Type), post.SubredditNamePrefixed),
 			URL:     "https://reddit.com/" + post.SubredditNamePrefixed,
 			IconURL: "https://www.redditstatic.com/desktop2x/img/favicon/android-icon-192x192.png",
 		},
 		Footer: &discord.EmbedFooter{
 			Text: "posted by " + post.Author,
 		},
-		Timestamp: json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
+	}
+	if imageRegex.MatchString(post.URL) {
+		embed.Image = &discord.EmbedResource{
+			URL: post.URL,
+		}
 	}
 
 	postsSent.With(prometheus.Labels{
-		"subreddit":  subscription.Subreddit,
-		"webhook_id": strconv.FormatUint(uint64(subscription.WebhookID), 10),
-		"guild_id":   strconv.FormatUint(uint64(subscription.GuildID), 10),
-		"channel_id": strconv.FormatUint(uint64(subscription.ChannelID), 10),
+		"subreddit":  sub.Subreddit,
+		"type":       sub.Type,
+		"webhook_id": strconv.FormatUint(uint64(sub.WebhookID), 10),
+		"guild_id":   strconv.FormatUint(uint64(sub.GuildID), 10),
+		"channel_id": strconv.FormatUint(uint64(sub.ChannelID), 10),
 	}).Inc()
 
 	if b.Cfg.TestMode {
-		log.Debugf("sending post to webhook %d: %s", subscription.WebhookID, post.Title)
+		log.Debugf("sending post to webhook %d: %s", sub.WebhookID, post.Title)
 		return
 	}
 
-	if _, err := b.Client.Rest().CreateWebhookMessage(subscription.WebhookID, subscription.WebhookToken, discord.WebhookMessageCreate{
-		AvatarURL: "https://www.redditstatic.com/desktop2x/img/favicon/android-icon-192x192.png",
-		Embeds:    []discord.Embed{embed},
-	}, false, 0); err != nil {
+	if _, err := b.Client.Rest().CreateWebhookMessage(sub.WebhookID, sub.WebhookToken, discord.WebhookMessageCreate{Embeds: []discord.Embed{embed}}, false, 0); err != nil {
 		var restError rest.Error
 		if errors.Is(err, &restError) && restError.Response.StatusCode == http.StatusNotFound {
-			if err = b.RemoveSubscription(subscription.WebhookID); err != nil {
-				log.Errorf("error removing subscription for webhook %s: %s", subscription.WebhookID, err.Error())
+			if err = b.RemoveSubscription(sub.WebhookID); err != nil {
+				log.Errorf("error removing sub for webhook %s: %s", sub.WebhookID, err.Error())
 			}
 			return
 		}
-		log.Errorf("error sending post to webhook %d: %s", subscription.WebhookID, err.Error())
+		log.Errorf("error sending post to webhook %d: %s", sub.WebhookID, err.Error())
 	}
 }
 
-type RedditResponse struct {
-	Data struct {
-		Before   string `json:"before"`
-		Children []struct {
-			Data RedditPost `json:"data"`
-		} `json:"children"`
-	} `json:"data"`
-}
-
-type RedditPost struct {
-	Selftext              string  `json:"selftext"`
-	AuthorFullname        string  `json:"author_fullname"`
-	Title                 string  `json:"title"`
-	SubredditNamePrefixed string  `json:"subreddit_name_prefixed"`
-	ID                    string  `json:"id"`
-	Name                  string  `json:"name"`
-	Author                string  `json:"author"`
-	Url                   string  `json:"url"`
-	Permalink             string  `json:"permalink"`
-	CreatedUtc            float64 `json:"created_utc"`
+func cutString(str string, maxLen int) string {
+	runes := []rune(str)
+	if len(runes) > maxLen {
+		return string(runes[0:maxLen-1]) + "…"
+	}
+	return string(runes)
 }
