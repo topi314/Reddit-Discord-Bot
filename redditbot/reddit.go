@@ -157,7 +157,7 @@ func (r *Reddit) CheckSubreddit(subreddit string) error {
 		return err
 	}
 
-	if len(response.Data.Children) == 0 {
+	if response.Kind == "Listing" && len(response.Data.Children) == 0 {
 		return ErrSubredditNotFound
 	}
 
@@ -215,6 +215,7 @@ func (r *Reddit) GetPosts(client *Reddit, subreddit string, fetchType string, la
 }
 
 type RedditResponse struct {
+	Kind string `json:"kind"`
 	Data struct {
 		Before   string `json:"before"`
 		Children []struct {
