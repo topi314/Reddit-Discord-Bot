@@ -34,6 +34,7 @@ func ReadConfig() (Config, error) {
 
 	f.String("reddit.client_id", "", "Reddit client ID")
 	f.String("reddit.client_secret", "", "Reddit client secret")
+	f.Int("reddit.requests_per_minute", 59, "Reddit requests per minute (default: 59)")
 
 	f.String("database.type", string(DatabaseTypeSQLite), "Database type (sqlite, postgres)")
 
@@ -201,14 +202,16 @@ func (c DiscordConfig) Validate() error {
 }
 
 type RedditConfig struct {
-	ClientID     string `koanf:"client_id"`
-	ClientSecret string `koanf:"client_secret"`
+	ClientID          string `koanf:"client_id"`
+	ClientSecret      string `koanf:"client_secret"`
+	RequestsPerMinute int    `koanf:"requests_per_minute"`
 }
 
 func (c RedditConfig) String() string {
-	return fmt.Sprintf("\n  ClientID: %v\n  ClientSecret: %v",
+	return fmt.Sprintf("\n  ClientID: %s\n  ClientSecret: %s\n  RequestsPerMinute: %d",
 		c.ClientID,
 		strings.Repeat("*", len(c.ClientSecret)),
+		c.RequestsPerMinute,
 	)
 }
 
@@ -218,6 +221,9 @@ func (c RedditConfig) Validate() error {
 	}
 	if c.ClientSecret == "" {
 		return fmt.Errorf("reddit.client_secret must be set")
+	}
+	if c.RequestsPerMinute <= 0 {
+		return fmt.Errorf("reddit.requests_per_minute must be greater than 0")
 	}
 	return nil
 }

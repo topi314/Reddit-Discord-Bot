@@ -21,6 +21,7 @@ discord:
 reddit:
   client_id: ...
   client_secret: ...
+  requests_per_minute: 59
 
 database:
   type: sqlite

@@ -18,14 +18,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const (
-	// RequestsPerMinute is the number of requests per minute we can make to the reddit API. This is 600 requests per 10 minutes.
-	RequestsPerMinute = 590 / 10
-
-	// WaitTime is the time we wait between requests to the reddit API to avoid hitting the ratelimit.
-	WaitTime = time.Minute / RequestsPerMinute
-)
-
 var (
 	ErrSubredditNotFound  = errors.New("subreddit not found")
 	ErrSubredditForbidden = errors.New("subreddit forbidden")
@@ -85,6 +77,10 @@ func (b *Bot) RemoveSubscriptionByGuildSubreddit(guildID snowflake.ID, subreddit
 	return nil
 }
 
+func (b *Bot) waitTime() time.Duration {
+	return time.Minute / time.Duration(b.Cfg.Reddit.RequestsPerMinute)
+}
+
 func (b *Bot) ListenSubreddits() {
 	for {
 		now := time.Now()
@@ -108,14 +104,14 @@ func (b *Bot) ListenSubreddits() {
 
 			b.checkSubreddit(subscriptions[i])
 
-			waitTime := WaitTime - time.Now().Sub(subNow)
+			waitTime := b.waitTime() - time.Now().Sub(subNow)
 			if waitTime > 0 {
-				<-time.After(WaitTime)
+				<-time.After(waitTime)
 			}
 		}
 
 		duration := time.Now().Sub(now)
-		if duration > time.Duration(len(subscriptions))*WaitTime {
+		if duration > time.Duration(len(subscriptions))*b.waitTime() {
 			log.Debugf("took %s too long to check %d subreddits", duration.String(), len(subscriptions))
 		}
 	}
