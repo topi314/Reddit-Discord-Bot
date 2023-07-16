@@ -100,14 +100,17 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 	used, err := strconv.ParseFloat(headers.Get("X-Ratelimit-Used"), 64)
 	if err != nil {
 		log.Error("error parsing x-ratelimit-used:", err.Error())
+		used = float64(r.rateLimit.used + 1)
 	}
 	remaining, err := strconv.ParseFloat(headers.Get("X-Ratelimit-Remaining"), 64)
 	if err != nil {
 		log.Error("error parsing x-ratelimit-remaining:", err.Error())
+		remaining = float64(r.rateLimit.remaining - 1)
 	}
 	reset, err := strconv.ParseFloat(headers.Get("X-Ratelimit-Reset"), 64)
 	if err != nil {
 		log.Error("error parsing x-ratelimit-reset:", err.Error())
+		reset = float64(r.rateLimit.reset.Unix())
 	}
 
 	r.rateLimit = rateLimit{
