@@ -43,7 +43,7 @@ jobs:
           CGO_ENABLED=0
           GOOS=${{ matrix.goos }}
           GOARCH=${{ matrix.goarch }}
-          go build -ldflags "-X main.Version=${{ env.VERSION }} -X main.Commit=${{ env.COMMIT }}" -o reddit-discord-bot-${{ matrix.goos }}-${{ matrix.goarch }}${{ env.file_name }} github.com/topi314/reddit-discord-bot
+          go build -ldflags "-X main.Version=${{ env.VERSION }} -X main.Commit=${{ env.COMMIT }}" -o reddit-discord-bot-${{ matrix.goos }}-${{ matrix.goarch }}${{ env.file_name }} github.com/topi314/reddit-discord-bot/v2
 
       - name: Upload
         uses: actions/upload-artifact@v2
