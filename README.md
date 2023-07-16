@@ -29,7 +29,7 @@ The bot does not require any permissions and can't do anything in your Discord. 
 To add a new subreddit run
 
 ```bash
-/subreddit add <subreddit-name>
+/reddit add <subreddit-name> (new/hot/top/rising)
 ```
 
 and click the returned link
@@ -41,7 +41,7 @@ select the server & channel in the discord popup & hit okay that's all!
 To remove a subreddit subscriptions run
 
 ```bash
-/subreddit remove <subreddit-name>
+/reddit remove <subreddit-name>
 ```
 
 and remove the bot under `Server Settings > Integrations` or just delete the webhook under `Channel Settings > Integrations > Webhooks`
@@ -51,7 +51,7 @@ and remove the bot under `Server Settings > Integrations` or just delete the web
 To list all subreddit subscriptions run
 
 ```bash
-/subreddit list
+/reddit list (channel)
 ```
 
 ## Public Bot
@@ -167,3 +167,4 @@ Contributions are always welcome! Just open a pull request or discussion and I w
 - [Discord](https://discord.gg/sD3ABd5)
 - [Twitter](https://twitter.com/topi314)
 - [Email](mailto:git@topi.wtf)
+- [Matrix](https://matrix.to/#/@topi:topi.wtf)

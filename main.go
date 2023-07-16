@@ -16,7 +16,7 @@ import (
 	"github.com/disgoorg/log"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/topi314/reddit-discord-bot/redditbot"
+	"github.com/topi314/reddit-discord-bot/v2/redditbot"
 	"golang.org/x/oauth2"
 )
 

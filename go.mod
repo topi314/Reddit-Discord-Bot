@@ -1,4 +1,4 @@
-module github.com/topi314/reddit-discord-bot
+module github.com/topi314/reddit-discord-bot/v2
 
 go 1.18
 
