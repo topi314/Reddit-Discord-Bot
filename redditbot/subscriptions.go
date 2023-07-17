@@ -84,7 +84,7 @@ func (b *Bot) waitTime() time.Duration {
 func (b *Bot) ListenSubreddits() {
 	for {
 		now := time.Now()
-		subscriptions, err := b.DB.GetAllSubscriptions()
+		subscriptions, err := b.DB.GetAllSubscriptionIDs()
 		if err != nil {
 			log.Error("error getting subscriptions:", err.Error())
 			continue
@@ -93,16 +93,15 @@ func (b *Bot) ListenSubreddits() {
 
 		for i := range subscriptions {
 			subNow := time.Now()
-			ok, err := b.DB.HasSubscription(subscriptions[i].WebhookID)
-			if err != nil {
-				log.Errorf("error checking subscription for webhook %s: %s", subscriptions[i].WebhookID, err.Error())
+			sub, err := b.DB.GetSubscription(subscriptions[i])
+			if err == ErrSubscriptionNotFound {
 				continue
-			}
-			if !ok {
+			} else if err != nil {
+				log.Errorf("error checking subscription for webhook %s: %s", subscriptions[i], err.Error())
 				continue
 			}
 
-			b.checkSubreddit(subscriptions[i])
+			b.checkSubscription(*sub)
 
 			waitTime := b.waitTime() - time.Now().Sub(subNow)
 			if waitTime > 0 {
@@ -117,9 +116,8 @@ func (b *Bot) ListenSubreddits() {
 	}
 }
 
-func (b *Bot) checkSubreddit(sub Subscription) {
-	lastPost := b.LastPosts[sub.WebhookID]
-	posts, before, err := b.Reddit.GetPosts(b.Reddit, sub.Subreddit, sub.Type, lastPost)
+func (b *Bot) checkSubscription(sub Subscription) {
+	posts, before, err := b.Reddit.GetPosts(b.Reddit, sub.Subreddit, sub.Type, sub.LastPost)
 	if err != nil {
 		log.Errorf("error getting posts for subreddit %s: %s", sub.Subreddit, err.Error())
 		if errors.Is(err, ErrSubredditNotFound) || errors.Is(err, ErrSubredditForbidden) {
@@ -131,35 +129,48 @@ func (b *Bot) checkSubreddit(sub Subscription) {
 	}
 	log.Debugf("got %d posts for subreddit %s before: %v\n", len(posts), sub.Subreddit, before)
 
-	if lastPost != "" {
+	if sub.LastPost != "" {
 		for i := len(posts) - 1; i >= 0; i-- {
 			b.sendPost(sub, posts[i])
 		}
 	}
 	if before != "" {
-		b.LastPosts[sub.WebhookID] = before
+		if err = b.DB.UpdateSubscriptionLastPost(sub.WebhookID, before); err != nil {
+			log.Errorf("error updating last post for webhook %s: %s", sub.WebhookID, err.Error())
+		}
 	}
 }
 
 func (b *Bot) sendPost(sub Subscription, post RedditPost) {
-	embed := discord.Embed{
-		Title:       cutString(post.Title, 256),
-		Description: cutString(html.UnescapeString(post.Selftext), 4069),
-		URL:         "https://reddit.com" + post.Permalink,
-		Timestamp:   json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
-		Color:       0xff581a,
-		Author: &discord.EmbedAuthor{
-			Name:    fmt.Sprintf("%s post in %s", strings.Title(sub.Type), post.SubredditNamePrefixed),
-			URL:     "https://reddit.com/" + post.SubredditNamePrefixed,
-			IconURL: "https://www.redditstatic.com/desktop2x/img/favicon/android-icon-192x192.png",
-		},
-		Footer: &discord.EmbedFooter{
-			Text: "posted by " + post.Author,
-		},
-	}
-	if imageRegex.MatchString(post.URL) {
-		embed.Image = &discord.EmbedResource{
-			URL: post.URL,
+	var webhookMessageCreate discord.WebhookMessageCreate
+	switch sub.FormatType {
+	case FormatTypeEmbed:
+		embed := discord.Embed{
+			Title:       cutString(post.Title, 256),
+			Description: cutString(html.UnescapeString(post.Selftext), 4069),
+			URL:         "https://reddit.com" + post.Permalink,
+			Timestamp:   json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
+			Color:       0xff581a,
+			Author: &discord.EmbedAuthor{
+				Name: fmt.Sprintf("%s post in %s", strings.Title(sub.Type), post.SubredditNamePrefixed),
+				URL:  "https://reddit.com/" + post.SubredditNamePrefixed,
+			},
+			Footer: &discord.EmbedFooter{
+				Text: "posted by " + post.Author,
+			},
+		}
+		if imageRegex.MatchString(post.URL) {
+			embed.Image = &discord.EmbedResource{
+				URL: post.URL,
+			}
+		}
+
+		webhookMessageCreate = discord.WebhookMessageCreate{
+			Embeds: []discord.Embed{embed},
+		}
+	case FormatTypeText:
+		webhookMessageCreate = discord.WebhookMessageCreate{
+			Content: fmt.Sprintf("## [%s](https://reddit.com%s)\n%s", post.Title, post.Permalink, cutString(quoteString(html.UnescapeString(post.Selftext)), 4000)),
 		}
 	}
 
@@ -176,7 +187,7 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) {
 		return
 	}
 
-	if _, err := b.Client.Rest().CreateWebhookMessage(sub.WebhookID, sub.WebhookToken, discord.WebhookMessageCreate{Embeds: []discord.Embed{embed}}, false, 0); err != nil {
+	if _, err := b.Client.Rest().CreateWebhookMessage(sub.WebhookID, sub.WebhookToken, webhookMessageCreate, false, 0); err != nil {
 		var restError rest.Error
 		if errors.Is(err, &restError) && restError.Response.StatusCode == http.StatusNotFound {
 			if err = b.RemoveSubscription(sub.WebhookID); err != nil {
@@ -194,4 +205,8 @@ func cutString(str string, maxLen int) string {
 		return string(runes[0:maxLen-1]) + "…"
 	}
 	return string(runes)
+}
+
+func quoteString(str string) string {
+	return "> " + strings.ReplaceAll(str, "\n", "\n> ")
 }

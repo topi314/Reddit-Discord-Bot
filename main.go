@@ -14,7 +14,6 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/log"
-	"github.com/disgoorg/snowflake/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/topi314/reddit-discord-bot/v2/redditbot"
 	"golang.org/x/oauth2"
@@ -88,8 +87,7 @@ func main() {
 				string(discord.OAuth2ScopeWebhookIncoming),
 			},
 		},
-		States:    map[string]redditbot.SetupState{},
-		LastPosts: map[snowflake.ID]string{},
+		States: map[string]redditbot.SetupState{},
 	}
 	defer b.Close()
 

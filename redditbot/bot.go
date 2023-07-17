@@ -8,7 +8,6 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/log"
-	"github.com/disgoorg/snowflake/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/oauth2"
@@ -33,6 +32,8 @@ var redditRequests = promauto.NewCounterVec(prometheus.CounterOpts{
 
 type SetupState struct {
 	Subreddit   string
+	PostType    string
+	FormatType  FormatType
 	Interaction discord.ApplicationCommandInteraction
 }
 
@@ -47,8 +48,7 @@ type Bot struct {
 	DiscordConfig *oauth2.Config
 	Rand          *rand.Rand
 
-	States    map[string]SetupState
-	LastPosts map[snowflake.ID]string
+	States map[string]SetupState
 }
 
 func (b *Bot) randomString(length int) string {

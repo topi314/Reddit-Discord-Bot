@@ -2,6 +2,9 @@
 
 Simple webhook based bot delivering Reddit posts into your Discord Server
 
+<img src=".github/embed-preview.png" alt="embed reddit post">
+<img src=".github/text-preview.png" alt="text reddit post">
+
 The bot does not require any permissions and can't do anything in your Discord. With that it's safe to use!
 
 <details>
@@ -29,12 +32,20 @@ The bot does not require any permissions and can't do anything in your Discord. 
 To add a new subreddit run
 
 ```bash
-/reddit add <subreddit-name> (new/hot/top/rising)
+/reddit add <subreddit-name> (new/hot/top/rising) (embed/text)
 ```
 
 and click the returned link
 
 select the server & channel in the discord popup & hit okay that's all!
+
+### Update Subreddit
+
+To update a subreddit run
+
+```bash
+/reddit update <subreddit-name> (new/hot/top/rising) (embed/text)
+```
 
 ### Remove Subreddit
 

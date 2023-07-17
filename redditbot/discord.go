@@ -12,6 +12,36 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 )
 
+var typeChoices = []discord.ApplicationCommandOptionChoiceString{
+	{
+		Name:  "New",
+		Value: "new",
+	},
+	{
+		Name:  "Hot",
+		Value: "hot",
+	},
+	{
+		Name:  "Top",
+		Value: "top",
+	},
+	{
+		Name:  "Rising",
+		Value: "rising",
+	},
+}
+
+var formatTypeChoices = []discord.ApplicationCommandOptionChoiceString{
+	{
+		Name:  strings.Title(string(FormatTypeEmbed)),
+		Value: string(FormatTypeEmbed),
+	},
+	{
+		Name:  strings.Title(string(FormatTypeText)),
+		Value: string(FormatTypeText),
+	},
+}
+
 var Commands = []discord.ApplicationCommandCreate{
 	discord.SlashCommandCreate{
 		Name:        "reddit",
@@ -30,24 +60,36 @@ var Commands = []discord.ApplicationCommandCreate{
 						Name:        "type",
 						Description: "the type of posts to send",
 						Required:    false,
-						Choices: []discord.ApplicationCommandOptionChoiceString{
-							{
-								Name:  "New",
-								Value: "new",
-							},
-							{
-								Name:  "Hot",
-								Value: "hot",
-							},
-							{
-								Name:  "Top",
-								Value: "top",
-							},
-							{
-								Name:  "Rising",
-								Value: "rising",
-							},
-						},
+						Choices:     typeChoices,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "format-type",
+						Description: "how to format the subreddit posts",
+						Required:    false,
+						Choices:     formatTypeChoices,
+					},
+				},
+			},
+			discord.ApplicationCommandOptionSubCommand{
+				Name:        "update",
+				Description: "update a subreddit in your subscriptions",
+				Options: []discord.ApplicationCommandOption{
+					discord.ApplicationCommandOptionString{
+						Name:        "subreddit",
+						Description: "the subreddit to update",
+						Required:    true,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "type",
+						Description: "the type of posts to send",
+						Required:    false,
+						Choices:     typeChoices,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "format-type",
+						Description: "how to format the subreddit posts",
+						Required:    false,
+						Choices:     formatTypeChoices,
 					},
 				},
 			},
@@ -74,6 +116,7 @@ var Commands = []discord.ApplicationCommandCreate{
 				},
 			},
 		},
+		DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionManageGuild),
 	},
 	discord.SlashCommandCreate{
 		Name:        "info",
@@ -88,6 +131,8 @@ func (b *Bot) OnApplicationCommand(event *events.ApplicationCommandInteractionCr
 		switch *data.SubCommandName {
 		case "add":
 			b.OnSubredditAdd(data, event)
+		case "update":
+			b.OnSubredditUpdate(data, event)
 		case "remove":
 			b.OnSubredditRemove(data, event)
 		case "list":
@@ -103,6 +148,10 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	postType, ok := data.OptString("type")
 	if !ok {
 		postType = "new"
+	}
+	formatType, ok := data.OptString("format-type")
+	if !ok {
+		formatType = "embed"
 	}
 
 	ok, err := b.DB.HasSubscriptionByGuildSubreddit(*event.GuildID(), subreddit)
@@ -135,6 +184,8 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 
 		b.States[state] = SetupState{
 			Subreddit:   subreddit,
+			PostType:    postType,
+			FormatType:  FormatType(formatType),
 			Interaction: event.ApplicationCommandInteraction,
 		}
 		_ = event.CreateMessage(discord.MessageCreate{
@@ -174,6 +225,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	if err = b.DB.AddSubscription(Subscription{
 		Subreddit:    subreddit,
 		Type:         postType,
+		FormatType:   FormatType(formatType),
 		GuildID:      *event.GuildID(),
 		ChannelID:    event.Channel().ID(),
 		WebhookID:    webhook.ID(),
@@ -188,6 +240,48 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 
 	_ = event.CreateMessage(discord.MessageCreate{
 		Content: fmt.Sprintf("Subscribed to [r/%s](https://reddit.com/r/%s)", subreddit, subreddit),
+	})
+}
+
+func (b *Bot) OnSubredditUpdate(data discord.SlashCommandInteractionData, event *events.ApplicationCommandInteractionCreate) {
+	subreddit := data.String("subreddit")
+	postType := data.String("type")
+	formatType := FormatType(data.String("format-type"))
+
+	sub, err := b.DB.GetSubscriptionsByGuildSubreddit(*event.GuildID(), subreddit)
+	if err == ErrSubscriptionNotFound {
+		_ = event.CreateMessage(discord.MessageCreate{
+			Content: fmt.Sprintf("You are not subscribed to r/%s", subreddit),
+			Flags:   discord.MessageFlagEphemeral,
+		})
+		return
+	}
+	if err != nil {
+		_ = event.CreateMessage(discord.MessageCreate{
+			Content: "Failed to get subscription from the database: " + err.Error(),
+			Flags:   discord.MessageFlagEphemeral,
+		})
+		return
+	}
+
+	if postType == "" {
+		postType = sub.Type
+	}
+	if formatType == "" {
+		formatType = sub.FormatType
+	}
+
+	if err = b.DB.UpdateSubscription(sub.WebhookID, postType, formatType); err != nil {
+		_ = event.CreateMessage(discord.MessageCreate{
+			Content: "Failed to update subscription: " + err.Error(),
+			Flags:   discord.MessageFlagEphemeral,
+		})
+		return
+	}
+
+	_ = event.CreateMessage(discord.MessageCreate{
+		Content: fmt.Sprintf("Updated subscription for [r/%s](https://reddit.com/r/%s)", subreddit, subreddit),
+		Flags:   discord.MessageFlagEphemeral,
 	})
 }
 
@@ -237,7 +331,7 @@ func (b *Bot) OnSubredditList(data discord.SlashCommandInteractionData, event *e
 
 	content := fmt.Sprintf("# Subscriptions(%d):\n", len(subs))
 	for _, sub := range subs {
-		content += fmt.Sprintf("- `%s` - [r/%s](https://reddit.com/r/%s)\n", strings.Title(sub.Type), sub.Subreddit, sub.Subreddit)
+		content += fmt.Sprintf("- `%s` - `%s` - [r/%s](<https://reddit.com/r/%s>)\n", strings.Title(sub.Type), strings.Title(string(sub.FormatType)), sub.Subreddit, sub.Subreddit)
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{
@@ -290,6 +384,8 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 
 	if err = b.DB.AddSubscription(Subscription{
 		Subreddit:    setupState.Subreddit,
+		Type:         setupState.PostType,
+		FormatType:   setupState.FormatType,
 		GuildID:      *setupState.Interaction.GuildID(),
 		ChannelID:    setupState.Interaction.Channel().ID(),
 		WebhookID:    webhookID,
