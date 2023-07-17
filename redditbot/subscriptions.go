@@ -117,7 +117,18 @@ func (b *Bot) ListenSubreddits() {
 }
 
 func (b *Bot) checkSubscription(sub Subscription) {
-	posts, before, err := b.Reddit.GetPosts(b.Reddit, sub.Subreddit, sub.Type, sub.LastPost)
+	if sub.SubredditIcon == "" {
+		icon, err := b.Reddit.GetSubredditIcon(sub.Subreddit)
+		if err != nil {
+			log.Errorf("error getting subreddit icon for subreddit %s: %s", sub.Subreddit, err.Error())
+		} else {
+			if err = b.DB.UpdateSubscriptionSubredditIcon(sub.WebhookID, icon); err != nil {
+				log.Errorf("error updating subreddit icon for webhook %s: %s", sub.WebhookID, err.Error())
+			}
+			sub.SubredditIcon = icon
+		}
+	}
+	posts, before, err := b.Reddit.GetPosts(sub.Subreddit, sub.Type, sub.LastPost)
 	if err != nil {
 		log.Errorf("error getting posts for subreddit %s: %s", sub.Subreddit, err.Error())
 		if errors.Is(err, ErrSubredditNotFound) || errors.Is(err, ErrSubredditForbidden) {
@@ -152,8 +163,9 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) {
 			Timestamp:   json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
 			Color:       0xff581a,
 			Author: &discord.EmbedAuthor{
-				Name: fmt.Sprintf("%s post in %s", strings.Title(sub.Type), post.SubredditNamePrefixed),
-				URL:  "https://reddit.com/" + post.SubredditNamePrefixed,
+				Name:    fmt.Sprintf("%s post in %s", strings.Title(sub.Type), post.SubredditNamePrefixed),
+				URL:     "https://reddit.com/" + post.SubredditNamePrefixed,
+				IconURL: sub.SubredditIcon,
 			},
 			Footer: &discord.EmbedFooter{
 				Text: "posted by " + post.Author,

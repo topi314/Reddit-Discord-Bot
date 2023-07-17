@@ -31,10 +31,11 @@ var redditRequests = promauto.NewCounterVec(prometheus.CounterOpts{
 }, []string{"path", "method", "status", "important", "sleep", "used", "remaining", "reset"})
 
 type SetupState struct {
-	Subreddit   string
-	PostType    string
-	FormatType  FormatType
-	Interaction discord.ApplicationCommandInteraction
+	Subreddit     string
+	SubredditIcon string
+	PostType      string
+	FormatType    FormatType
+	Interaction   discord.ApplicationCommandInteraction
 }
 
 type Bot struct {

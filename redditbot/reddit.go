@@ -133,38 +133,38 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 	return rs, nil
 }
 
-func (r *Reddit) CheckSubreddit(subreddit string) error {
+func (r *Reddit) CheckSubreddit(subreddit string) (string, error) {
 	url := fmt.Sprintf("https://oauth.reddit.com/r/%s/about.json", subreddit)
 	rq, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	rs, err := r.do(rq, true)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer rs.Body.Close()
 
 	if rs.StatusCode == http.StatusNotFound || rs.StatusCode == http.StatusBadRequest {
-		return ErrSubredditNotFound
+		return "", ErrSubredditNotFound
 	} else if rs.StatusCode == http.StatusForbidden {
-		return ErrSubredditForbidden
+		return "", ErrSubredditForbidden
 	}
 
-	var response RedditResponse
+	var response RedditResponse[RedditAbout]
 	if err = json.NewDecoder(rs.Body).Decode(&response); err != nil {
-		return err
+		return "", err
 	}
 
-	if response.Kind == "Listing" && len(response.Data.Children) == 0 {
-		return ErrSubredditNotFound
+	if response.Kind == "Listing" {
+		return "", ErrSubredditNotFound
 	}
 
-	return nil
+	return response.Data.IconImg, nil
 }
 
-func (r *Reddit) GetPosts(client *Reddit, subreddit string, fetchType string, lastPost string) ([]RedditPost, string, error) {
+func (r *Reddit) GetPosts(subreddit string, fetchType string, lastPost string) ([]RedditPost, string, error) {
 	url := fmt.Sprintf("https://oauth.reddit.com/r/%s/%s.json?raw_json=1&limit=100", subreddit, fetchType)
 	if lastPost != "" {
 		url += fmt.Sprintf("&before=%s", lastPost)
@@ -175,7 +175,7 @@ func (r *Reddit) GetPosts(client *Reddit, subreddit string, fetchType string, la
 		return nil, "", err
 	}
 
-	rs, err := client.do(rq, false)
+	rs, err := r.do(rq, false)
 	if err != nil {
 		return nil, "", err
 	}
@@ -187,7 +187,7 @@ func (r *Reddit) GetPosts(client *Reddit, subreddit string, fetchType string, la
 		return nil, "", ErrSubredditForbidden
 	}
 
-	var response RedditResponse
+	var response RedditResponse[RedditListing[RedditPost]]
 	if err = json.NewDecoder(rs.Body).Decode(&response); err != nil {
 		return nil, "", err
 	}
@@ -200,7 +200,7 @@ func (r *Reddit) GetPosts(client *Reddit, subreddit string, fetchType string, la
 
 	if response.Data.Before != "" {
 		var morePosts []RedditPost
-		morePosts, before, err = r.GetPosts(client, subreddit, fetchType, before)
+		morePosts, before, err = r.GetPosts(subreddit, fetchType, before)
 		if err != nil {
 			return nil, "", err
 		}
@@ -210,18 +210,54 @@ func (r *Reddit) GetPosts(client *Reddit, subreddit string, fetchType string, la
 	if len(posts) > 0 && before == "" {
 		before = posts[0].Name
 	}
-
 	return posts, before, nil
 }
 
-type RedditResponse struct {
+func (r *Reddit) GetSubredditIcon(subreddit string) (string, error) {
+	url := fmt.Sprintf("https://oauth.reddit.com/r/%s/about.json", subreddit)
+	rq, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	rs, err := r.do(rq, true)
+	if err != nil {
+		return "", err
+	}
+	defer rs.Body.Close()
+
+	if rs.StatusCode == http.StatusNotFound {
+		return "", ErrSubredditNotFound
+	} else if rs.StatusCode == http.StatusForbidden {
+		return "", ErrSubredditForbidden
+	}
+
+	var response RedditResponse[RedditAbout]
+	if err = json.NewDecoder(rs.Body).Decode(&response); err != nil {
+		return "", err
+	}
+
+	if response.Kind != "t5" {
+		return "", ErrSubredditNotFound
+	}
+
+	return response.Data.IconImg, nil
+}
+
+type RedditResponse[T any] struct {
 	Kind string `json:"kind"`
-	Data struct {
-		Before   string `json:"before"`
-		Children []struct {
-			Data RedditPost `json:"data"`
-		} `json:"children"`
-	} `json:"data"`
+	Data T      `json:"data"`
+}
+
+type RedditAbout struct {
+	IconImg string `json:"icon_img"`
+}
+
+type RedditListing[T any] struct {
+	Before   string `json:"before"`
+	Children []struct {
+		Data T `json:"data"`
+	} `json:"children"`
 }
 
 type RedditPost struct {
