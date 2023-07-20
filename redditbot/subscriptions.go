@@ -18,6 +18,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const RedditColor = 0xff581a
+
 var (
 	ErrSubredditNotFound  = errors.New("subreddit not found")
 	ErrSubredditForbidden = errors.New("subreddit forbidden")
@@ -41,7 +43,22 @@ func (b *Bot) AddSubscription(sub Subscription) error {
 	return nil
 }
 
-func (b *Bot) RemoveSubscription(webhookID snowflake.ID) error {
+func (b *Bot) RemoveSubscription(webhookID snowflake.ID, webhookToken string, err error) error {
+	if err != nil {
+		_, _ = b.Client.Rest().CreateWebhookMessage(webhookID, webhookToken, discord.WebhookMessageCreate{
+			Embeds: []discord.Embed{
+				{
+					Title:       "Error",
+					Timestamp:   json.Ptr(time.Now()),
+					Color:       RedditColor,
+					Description: fmt.Sprintf("An error occurred while trying to get posts from this subreddit: %s\nRemoving this webhook" + err.Error()),
+				},
+			},
+		}, false, 0)
+	}
+
+	_ = b.Client.Rest().DeleteWebhookWithToken(webhookID, webhookToken, rest.WithReason("Removing webhook because of error: "+err.Error()))
+
 	sub, err := b.DB.RemoveSubscription(webhookID)
 	if err != nil {
 		return err
@@ -120,7 +137,9 @@ func (b *Bot) checkSubscription(sub Subscription) {
 	if sub.SubredditIcon == "" {
 		icon, err := b.Reddit.GetSubredditIcon(sub.Subreddit)
 		if err != nil {
-			log.Errorf("error getting subreddit icon for subreddit %s: %s", sub.Subreddit, err.Error())
+			if !errors.Is(err, ErrSubredditNotFound) && !errors.Is(err, ErrSubredditForbidden) {
+				log.Errorf("error getting subreddit icon for subreddit %s: %s", sub.Subreddit, err.Error())
+			}
 		} else {
 			if err = b.DB.UpdateSubscriptionSubredditIcon(sub.WebhookID, icon); err != nil {
 				log.Errorf("error updating subreddit icon for webhook %s: %s", sub.WebhookID, err.Error())
@@ -132,13 +151,13 @@ func (b *Bot) checkSubscription(sub Subscription) {
 	if err != nil {
 		log.Errorf("error getting posts for subreddit %s: %s", sub.Subreddit, err.Error())
 		if errors.Is(err, ErrSubredditNotFound) || errors.Is(err, ErrSubredditForbidden) {
-			if err = b.RemoveSubscription(sub.WebhookID); err != nil {
+			if err = b.RemoveSubscription(sub.WebhookID, sub.WebhookToken, err); err != nil {
 				log.Errorf("error removing sub for webhook %s: %s", sub.WebhookID, err.Error())
 			}
 		}
 		return
 	}
-	log.Debugf("got %d posts for subreddit %s before: %v\n", len(posts), sub.Subreddit, before)
+	log.Debugf("got %d posts for subreddit %s before: %s\n", len(posts), sub.Subreddit, sub.LastPost)
 
 	if sub.LastPost != "" {
 		for i := len(posts) - 1; i >= 0; i-- {
@@ -161,7 +180,7 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) {
 			Description: cutString(html.UnescapeString(post.Selftext), 4069),
 			URL:         "https://reddit.com" + post.Permalink,
 			Timestamp:   json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
-			Color:       0xff581a,
+			Color:       RedditColor,
 			Author: &discord.EmbedAuthor{
 				Name:    fmt.Sprintf("%s post in %s", strings.Title(sub.Type), post.SubredditNamePrefixed),
 				URL:     "https://reddit.com/" + post.SubredditNamePrefixed,
@@ -202,7 +221,7 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) {
 	if _, err := b.Client.Rest().CreateWebhookMessage(sub.WebhookID, sub.WebhookToken, webhookMessageCreate, false, 0); err != nil {
 		var restError rest.Error
 		if errors.Is(err, &restError) && restError.Response.StatusCode == http.StatusNotFound {
-			if err = b.RemoveSubscription(sub.WebhookID); err != nil {
+			if err = b.RemoveSubscription(sub.WebhookID, sub.WebhookToken, nil); err != nil {
 				log.Errorf("error removing sub for webhook %s: %s", sub.WebhookID, err.Error())
 			}
 			return

@@ -183,7 +183,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		return
 	}
 
-	icon, err := b.Reddit.CheckSubreddit(subreddit)
+	icon, err := b.Reddit.GetSubredditIcon(subreddit)
 	if err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Invalid subreddit: " + err.Error(),
@@ -255,7 +255,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{
-		Content: fmt.Sprintf("Subscribed to [r/%s](https://reddit.com/r/%s)", subreddit, subreddit),
+		Content: fmt.Sprintf("Subscribed to [r/%s](<https://reddit.com/r/%s>)", subreddit, subreddit),
 	})
 }
 
@@ -445,7 +445,7 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 
 	delete(b.States, state)
 	_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
-		Content:    json.Ptr(fmt.Sprintf("Subscribed to [r/%s](https://reddit.com/r/%s)", setupState.Subreddit, setupState.Subreddit)),
+		Content:    json.Ptr(fmt.Sprintf("Subscribed to [r/%s](<https://reddit.com/r/%s>)", setupState.Subreddit, setupState.Subreddit)),
 		Components: &[]discord.ContainerComponent{},
 	})
 	w.Write([]byte("success, you can close this window now"))
