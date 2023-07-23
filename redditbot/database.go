@@ -3,6 +3,7 @@ package redditbot
 import (
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/disgoorg/snowflake/v2"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -22,15 +23,14 @@ const (
 )
 
 type Subscription struct {
-	Subreddit     string       `db:"subreddit"`
-	SubredditIcon string       `db:"subreddit_icon"`
-	Type          string       `db:"type"`
-	FormatType    FormatType   `db:"format_type"`
-	GuildID       snowflake.ID `db:"guild_id"`
-	ChannelID     snowflake.ID `db:"channel_id"`
-	WebhookID     snowflake.ID `db:"webhook_id"`
-	WebhookToken  string       `db:"webhook_token"`
-	LastPost      string       `db:"last_post"`
+	Subreddit    string       `db:"subreddit"`
+	Type         string       `db:"type"`
+	FormatType   FormatType   `db:"format_type"`
+	GuildID      snowflake.ID `db:"guild_id"`
+	ChannelID    snowflake.ID `db:"channel_id"`
+	WebhookID    snowflake.ID `db:"webhook_id"`
+	WebhookToken string       `db:"webhook_token"`
+	LastPost     time.Time    `db:"last_post"`
 }
 
 func NewDB(cfg DatabaseConfig, schema string) (*DB, error) {
@@ -70,7 +70,7 @@ func (d *DB) Close() error {
 }
 
 func (d *DB) AddSubscription(sub Subscription) error {
-	_, err := d.dbx.NamedExec(`INSERT INTO subscriptions (subreddit, subreddit_icon, format_type, guild_id, channel_id, webhook_id, webhook_token) VALUES (:subreddit, :subreddit_icon, :format_type, :guild_id, :channel_id, :webhook_id, :webhook_token)`, sub)
+	_, err := d.dbx.NamedExec(`INSERT INTO subscriptions (subreddit, format_type, guild_id, channel_id, webhook_id, webhook_token) VALUES (:subreddit, :format_type, :guild_id, :channel_id, :webhook_id, :webhook_token)`, sub)
 	return err
 }
 
@@ -79,18 +79,8 @@ func (d *DB) UpdateSubscription(webhookID snowflake.ID, postType string, formatT
 	return err
 }
 
-func (d *DB) UpdateSubscriptionLastPost(webhookID snowflake.ID, lastPost string) error {
+func (d *DB) UpdateSubscriptionLastPost(webhookID snowflake.ID, lastPost time.Time) error {
 	_, err := d.dbx.Exec(`UPDATE subscriptions SET last_post = $1 WHERE webhook_id = $2`, lastPost, webhookID)
-	return err
-}
-
-func (d *DB) UpdateSubscriptionSubredditIcon(webhookID snowflake.ID, subredditIcon string) error {
-	_, err := d.dbx.Exec(`UPDATE subscriptions SET subreddit_icon = $1 WHERE webhook_id = $2`, subredditIcon, webhookID)
-	return err
-}
-
-func (d *DB) CleanSubscriptionInfo(guildID snowflake.ID, subreddit string) error {
-	_, err := d.dbx.Exec(`UPDATE subscriptions SET subreddit_icon = '', last_post = '' WHERE guild_id = $1 AND subreddit = $2`, guildID, subreddit)
 	return err
 }
 

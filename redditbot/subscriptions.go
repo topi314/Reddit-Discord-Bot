@@ -94,7 +94,7 @@ func (b *Bot) RemoveSubscriptionByGuildSubreddit(guildID snowflake.ID, subreddit
 	return nil
 }
 
-func (b *Bot) waitTime() time.Duration {
+func (b *Bot) targetTime() time.Duration {
 	return time.Minute / time.Duration(b.Cfg.Reddit.RequestsPerMinute)
 }
 
@@ -120,34 +120,24 @@ func (b *Bot) ListenSubreddits() {
 
 			b.checkSubscription(*sub)
 
-			waitTime := b.waitTime() - time.Now().Sub(subNow)
+			waitTime := b.targetTime() - time.Now().Sub(subNow)
 			if waitTime > 0 {
+				log.Debugf("waiting %s before checking next sub", waitTime.String())
 				<-time.After(waitTime)
 			}
 		}
 
 		duration := time.Now().Sub(now)
-		if duration > time.Duration(len(subscriptions))*b.waitTime() {
+		if duration > time.Duration(len(subscriptions))*b.targetTime() {
 			log.Debugf("took %s too long to check %d subreddits", duration.String(), len(subscriptions))
 		}
+
+		time.Sleep(5 * time.Second)
 	}
 }
 
 func (b *Bot) checkSubscription(sub Subscription) {
-	if sub.SubredditIcon == "" {
-		icon, err := b.Reddit.GetSubredditIcon(sub.Subreddit)
-		if err != nil {
-			if !errors.Is(err, ErrSubredditNotFound) && !errors.Is(err, ErrSubredditForbidden) {
-				log.Errorf("error getting subreddit icon for subreddit %s: %s", sub.Subreddit, err.Error())
-			}
-		} else {
-			if err = b.DB.UpdateSubscriptionSubredditIcon(sub.WebhookID, icon); err != nil {
-				log.Errorf("error updating subreddit icon for webhook %s: %s", sub.WebhookID, err.Error())
-			}
-			sub.SubredditIcon = icon
-		}
-	}
-	posts, before, err := b.Reddit.GetPosts(sub.Subreddit, sub.Type, sub.LastPost)
+	posts, err := b.Reddit.GetPostsUntil(sub.Subreddit, sub.Type, sub.LastPost)
 	if err != nil {
 		log.Errorf("error getting posts for subreddit %s: %s", sub.Subreddit, err.Error())
 		if errors.Is(err, ErrSubredditNotFound) || errors.Is(err, ErrSubredditForbidden) {
@@ -159,13 +149,12 @@ func (b *Bot) checkSubscription(sub Subscription) {
 	}
 	log.Debugf("got %d posts for subreddit %s before: %s\n", len(posts), sub.Subreddit, sub.LastPost)
 
-	if sub.LastPost != "" {
-		for i := len(posts) - 1; i >= 0; i-- {
-			b.sendPost(sub, posts[i])
-		}
+	for i := len(posts) - 1; i >= 0; i-- {
+		b.sendPost(sub, posts[i])
 	}
-	if before != "" {
-		if err = b.DB.UpdateSubscriptionLastPost(sub.WebhookID, before); err != nil {
+
+	if len(posts) > 0 {
+		if err = b.DB.UpdateSubscriptionLastPost(sub.WebhookID, time.Unix(int64(posts[0].CreatedUtc), 0)); err != nil {
 			log.Errorf("error updating last post for webhook %s: %s", sub.WebhookID, err.Error())
 		}
 	}
@@ -184,7 +173,7 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) {
 			Author: &discord.EmbedAuthor{
 				Name:    fmt.Sprintf("%s post in %s", strings.Title(sub.Type), post.SubredditNamePrefixed),
 				URL:     "https://reddit.com/" + post.SubredditNamePrefixed,
-				IconURL: sub.SubredditIcon,
+				IconURL: post.SrDetail.CommunityIcon,
 			},
 			Footer: &discord.EmbedFooter{
 				Text: "posted by " + post.Author,

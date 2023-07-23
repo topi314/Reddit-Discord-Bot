@@ -133,53 +133,67 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 	return rs, nil
 }
 
-func (r *Reddit) GetPosts(subreddit string, fetchType string, lastPost string) ([]RedditPost, string, error) {
-	url := fmt.Sprintf("https://oauth.reddit.com/r/%s/%s.json?raw_json=1&limit=100", subreddit, fetchType)
-	if lastPost != "" {
-		url += fmt.Sprintf("&before=%s", lastPost)
+func (r *Reddit) GetPostsUntil(subreddit string, fetchType string, until time.Time) ([]RedditPost, error) {
+	var (
+		posts []RedditPost
+		after string
+	)
+	for {
+		newPosts, err := r.getPosts(subreddit, fetchType, after)
+		if err != nil {
+			return nil, err
+		}
+
+		for i := range newPosts {
+			createdAt := time.Unix(int64(newPosts[i].CreatedUtc), 0)
+			if createdAt.Before(until) || createdAt.Equal(until) {
+				return posts, nil
+			}
+			posts = append(posts, newPosts[i])
+		}
+
+		if len(newPosts) == 0 {
+			return posts, nil
+		}
+
+		after = newPosts[len(newPosts)-1].Name
+	}
+}
+
+func (r *Reddit) getPosts(subreddit string, fetchType string, after string) ([]RedditPost, error) {
+	url := fmt.Sprintf("https://oauth.reddit.com/r/%s/%s.json?raw_json=1&sr_detail=true&limit=100", subreddit, fetchType)
+	if after != "" {
+		url += fmt.Sprintf("&after=%s", after)
 	}
 	log.Debug("getting posts for url: ", url)
 	rq, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	rs, err := r.do(rq, false)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	defer rs.Body.Close()
 
 	if rs.StatusCode == http.StatusNotFound {
-		return nil, "", ErrSubredditNotFound
+		return nil, ErrSubredditNotFound
 	} else if rs.StatusCode == http.StatusForbidden {
-		return nil, "", ErrSubredditForbidden
+		return nil, ErrSubredditForbidden
 	}
 
 	var response RedditResponse[RedditListing[RedditPost]]
 	if err = json.NewDecoder(rs.Body).Decode(&response); err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	before := response.Data.Before
 	posts := make([]RedditPost, 0, len(response.Data.Children))
 	for i := range response.Data.Children {
 		posts = append(posts, response.Data.Children[i].Data)
 	}
 
-	if response.Data.Before != "" {
-		var morePosts []RedditPost
-		morePosts, before, err = r.GetPosts(subreddit, fetchType, before)
-		if err != nil {
-			return nil, "", err
-		}
-		posts = append(posts, morePosts...)
-	}
-
-	if len(posts) > 0 && before == "" {
-		before = posts[0].Name
-	}
-	return posts, before, nil
+	return posts, nil
 }
 
 func (r *Reddit) GetSubredditIcon(subreddit string) (string, error) {
@@ -230,14 +244,19 @@ type RedditListing[T any] struct {
 }
 
 type RedditPost struct {
-	Selftext              string  `json:"selftext"`
-	AuthorFullname        string  `json:"author_fullname"`
-	Title                 string  `json:"title"`
-	SubredditNamePrefixed string  `json:"subreddit_name_prefixed"`
-	ID                    string  `json:"id"`
-	Name                  string  `json:"name"`
-	Author                string  `json:"author"`
-	URL                   string  `json:"url"`
-	Permalink             string  `json:"permalink"`
-	CreatedUtc            float64 `json:"created_utc"`
+	Selftext              string          `json:"selftext"`
+	AuthorFullname        string          `json:"author_fullname"`
+	Title                 string          `json:"title"`
+	SubredditNamePrefixed string          `json:"subreddit_name_prefixed"`
+	ID                    string          `json:"id"`
+	Name                  string          `json:"name"`
+	Author                string          `json:"author"`
+	URL                   string          `json:"url"`
+	Permalink             string          `json:"permalink"`
+	CreatedUtc            float64         `json:"created_utc"`
+	SrDetail              SubredditDetail `json:"sr_detail"`
+}
+
+type SubredditDetail struct {
+	CommunityIcon string `json:"community_icon"`
 }

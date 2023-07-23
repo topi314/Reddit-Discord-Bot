@@ -94,17 +94,6 @@ var Commands = []discord.ApplicationCommandCreate{
 				},
 			},
 			discord.ApplicationCommandOptionSubCommand{
-				Name:        "flush",
-				Description: "flushes the subreddit icon & last post",
-				Options: []discord.ApplicationCommandOption{
-					discord.ApplicationCommandOptionString{
-						Name:        "subreddit",
-						Description: "the subreddit to flush",
-						Required:    true,
-					},
-				},
-			},
-			discord.ApplicationCommandOptionSubCommand{
 				Name:        "remove",
 				Description: "remove a subreddit from your subscriptions",
 				Options: []discord.ApplicationCommandOption{
@@ -148,8 +137,6 @@ func (b *Bot) OnApplicationCommand(event *events.ApplicationCommandInteractionCr
 			b.OnSubredditRemove(data, event)
 		case "list":
 			b.OnSubredditList(data, event)
-		case "flush":
-			b.OnSubredditFlush(data, event)
 		}
 	case "info":
 		b.OnInfo(event)
@@ -183,8 +170,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		return
 	}
 
-	icon, err := b.Reddit.GetSubredditIcon(subreddit)
-	if err != nil {
+	if _, err = b.Reddit.GetSubredditIcon(subreddit); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Invalid subreddit: " + err.Error(),
 			Flags:   discord.MessageFlagEphemeral,
@@ -197,11 +183,10 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		url := b.DiscordConfig.AuthCodeURL(state)
 
 		b.States[state] = SetupState{
-			Subreddit:     subreddit,
-			SubredditIcon: icon,
-			PostType:      postType,
-			FormatType:    FormatType(formatType),
-			Interaction:   event.ApplicationCommandInteraction,
+			Subreddit:   subreddit,
+			PostType:    postType,
+			FormatType:  FormatType(formatType),
+			Interaction: event.ApplicationCommandInteraction,
 		}
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: fmt.Sprintf("Click the button to add a webhook for the subreddit %s", subreddit),
@@ -238,14 +223,13 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	}
 
 	if err = b.DB.AddSubscription(Subscription{
-		Subreddit:     subreddit,
-		SubredditIcon: icon,
-		Type:          postType,
-		FormatType:    FormatType(formatType),
-		GuildID:       *event.GuildID(),
-		ChannelID:     event.Channel().ID(),
-		WebhookID:     webhook.ID(),
-		WebhookToken:  webhook.Token,
+		Subreddit:    subreddit,
+		Type:         postType,
+		FormatType:   FormatType(formatType),
+		GuildID:      *event.GuildID(),
+		ChannelID:    event.Channel().ID(),
+		WebhookID:    webhook.ID(),
+		WebhookToken: webhook.Token,
 	}); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Failed to save subscription to the database: " + err.Error(),
@@ -356,23 +340,6 @@ func (b *Bot) OnSubredditList(data discord.SlashCommandInteractionData, event *e
 	})
 }
 
-func (b *Bot) OnSubredditFlush(data discord.SlashCommandInteractionData, event *events.ApplicationCommandInteractionCreate) {
-	subreddit := data.String("subreddit")
-
-	if err := b.DB.CleanSubscriptionInfo(*event.GuildID(), subreddit); err != nil {
-		_ = event.CreateMessage(discord.MessageCreate{
-			Content: fmt.Sprintf("Something went wrong: %s", err),
-			Flags:   discord.MessageFlagEphemeral,
-		})
-		return
-	}
-
-	_ = event.CreateMessage(discord.MessageCreate{
-		Content: fmt.Sprintf("Flushed subreddit %s", subreddit),
-		Flags:   discord.MessageFlagEphemeral,
-	})
-}
-
 func (b *Bot) OnInfo(event *events.ApplicationCommandInteractionCreate) {
 	_ = event.CreateMessage(discord.MessageCreate{
 		Content: "I'm a bot that sends you reddit posts to discord.\nYou can add subreddits with `/subreddit add <subreddit>`\nYou can remove subreddits with `/subreddit remove <subreddit>`\nYou can list your subreddits with `/subreddit list`You can get help on [GitHub](https://github.com/topi314/Reddit-Discord-Bot)",
@@ -416,14 +383,13 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 	webhookToken := wh["token"].(string)
 
 	if err = b.DB.AddSubscription(Subscription{
-		Subreddit:     setupState.Subreddit,
-		SubredditIcon: setupState.SubredditIcon,
-		Type:          setupState.PostType,
-		FormatType:    setupState.FormatType,
-		GuildID:       *setupState.Interaction.GuildID(),
-		ChannelID:     setupState.Interaction.Channel().ID(),
-		WebhookID:     webhookID,
-		WebhookToken:  webhookToken,
+		Subreddit:    setupState.Subreddit,
+		Type:         setupState.PostType,
+		FormatType:   setupState.FormatType,
+		GuildID:      *setupState.Interaction.GuildID(),
+		ChannelID:    setupState.Interaction.Channel().ID(),
+		WebhookID:    webhookID,
+		WebhookToken: webhookToken,
 	}); err != nil {
 		_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 			Content:    json.Ptr("Failed to save subscription to the database: " + err.Error()),
