@@ -196,44 +196,40 @@ func (r *Reddit) getPosts(subreddit string, fetchType string, after string) ([]R
 	return posts, nil
 }
 
-func (r *Reddit) GetSubredditIcon(subreddit string) (string, error) {
+func (r *Reddit) CheckSubreddit(subreddit string) error {
 	url := fmt.Sprintf("https://oauth.reddit.com/r/%s/about.json?raw_json=1", subreddit)
 	rq, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	rs, err := r.do(rq, true)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer rs.Body.Close()
 
 	if rs.StatusCode == http.StatusNotFound {
-		return "", ErrSubredditNotFound
+		return ErrSubredditNotFound
 	} else if rs.StatusCode == http.StatusForbidden {
-		return "", ErrSubredditForbidden
+		return ErrSubredditForbidden
 	}
 
-	var response RedditResponse[RedditAbout]
+	var response RedditResponse[struct{}]
 	if err = json.NewDecoder(rs.Body).Decode(&response); err != nil {
-		return "", err
+		return err
 	}
 
 	if response.Kind != "t5" {
-		return "", ErrSubredditNotFound
+		return ErrSubredditNotFound
 	}
 
-	return response.Data.CommunityIcon, nil
+	return nil
 }
 
 type RedditResponse[T any] struct {
 	Kind string `json:"kind"`
 	Data T      `json:"data"`
-}
-
-type RedditAbout struct {
-	CommunityIcon string `json:"community_icon"`
 }
 
 type RedditListing[T any] struct {

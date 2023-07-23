@@ -20,9 +20,6 @@ import (
 )
 
 var (
-	Name      = "reddit-discord-bot"
-	Namespace = "github.com/topi314/reddit-discord-bot"
-
 	Version = "unknown"
 	Commit  = "unknown"
 )

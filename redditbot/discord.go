@@ -170,7 +170,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		return
 	}
 
-	if _, err = b.Reddit.GetSubredditIcon(subreddit); err != nil {
+	if err = b.Reddit.CheckSubreddit(subreddit); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Invalid subreddit: " + err.Error(),
 			Flags:   discord.MessageFlagEphemeral,
