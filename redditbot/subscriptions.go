@@ -111,7 +111,7 @@ func (b *Bot) ListenSubreddits() {
 		for i := range subscriptions {
 			subNow := time.Now()
 			sub, err := b.DB.GetSubscription(subscriptions[i])
-			if err == ErrSubscriptionNotFound {
+			if errors.Is(err, ErrSubscriptionNotFound) {
 				continue
 			} else if err != nil {
 				log.Errorf("error checking subscription for webhook %s: %s", subscriptions[i], err.Error())
@@ -150,7 +150,9 @@ func (b *Bot) checkSubscription(sub Subscription) {
 	log.Debugf("got %d posts for subreddit %s before: %s\n", len(posts), sub.Subreddit, sub.LastPost)
 
 	for i := len(posts) - 1; i >= 0; i-- {
-		b.sendPost(sub, posts[i])
+		if !b.sendPost(sub, posts[i]) {
+			return
+		}
 	}
 
 	if len(posts) > 0 {
@@ -160,7 +162,7 @@ func (b *Bot) checkSubscription(sub Subscription) {
 	}
 }
 
-func (b *Bot) sendPost(sub Subscription, post RedditPost) {
+func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 	var webhookMessageCreate discord.WebhookMessageCreate
 	switch sub.FormatType {
 	case FormatTypeEmbed:
@@ -204,19 +206,21 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) {
 
 	if b.Cfg.TestMode {
 		log.Debugf("sending post to webhook %d: %s", sub.WebhookID, post.Title)
-		return
+		return true
 	}
 
 	if _, err := b.Client.Rest().CreateWebhookMessage(sub.WebhookID, sub.WebhookToken, webhookMessageCreate, false, 0); err != nil {
 		var restError rest.Error
-		if errors.Is(err, &restError) && restError.Response.StatusCode == http.StatusNotFound {
+		if errors.As(err, &restError) && restError.Response.StatusCode == http.StatusNotFound {
 			if err = b.RemoveSubscription(sub.WebhookID, sub.WebhookToken, nil); err != nil {
 				log.Errorf("error removing sub for webhook %s: %s", sub.WebhookID, err.Error())
 			}
-			return
+			return false
 		}
 		log.Errorf("error sending post to webhook %d: %s", sub.WebhookID, err.Error())
 	}
+
+	return true
 }
 
 func cutString(str string, maxLen int) string {
