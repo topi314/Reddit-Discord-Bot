@@ -57,7 +57,11 @@ func (b *Bot) RemoveSubscription(webhookID snowflake.ID, webhookToken string, er
 		}, false, 0)
 	}
 
-	_ = b.Client.Rest().DeleteWebhookWithToken(webhookID, webhookToken, rest.WithReason("Removing webhook because of error: "+err.Error()))
+	errMessage := "unknown error"
+	if err != nil {
+		errMessage = err.Error()
+	}
+	_ = b.Client.Rest().DeleteWebhookWithToken(webhookID, webhookToken, rest.WithReason("Removing webhook because of error: "+errMessage))
 
 	sub, err := b.DB.RemoveSubscription(webhookID)
 	if err != nil {
