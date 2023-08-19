@@ -133,10 +133,11 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 	return rs, nil
 }
 
-func (r *Reddit) GetPostsUntil(subreddit string, fetchType string, until time.Time) ([]RedditPost, error) {
+func (r *Reddit) GetPostsUntil(subreddit string, fetchType string, until time.Time, maxPages int) ([]RedditPost, error) {
 	var (
 		posts []RedditPost
 		after string
+		page  = 1
 	)
 	for {
 		newPosts, err := r.getPosts(subreddit, fetchType, after)
@@ -157,6 +158,11 @@ func (r *Reddit) GetPostsUntil(subreddit string, fetchType string, until time.Ti
 		}
 
 		after = newPosts[len(newPosts)-1].Name
+
+		page++
+		if page > maxPages {
+			return posts, nil
+		}
 	}
 }
 

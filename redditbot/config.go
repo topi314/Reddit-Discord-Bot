@@ -35,6 +35,7 @@ func ReadConfig() (Config, error) {
 	f.String("reddit.client_id", "", "Reddit client ID")
 	f.String("reddit.client_secret", "", "Reddit client secret")
 	f.Int("reddit.requests_per_minute", 59, "Reddit requests per minute (default: 59)")
+	f.Int("reddit.max_pages", 2, "Reddit max pages (default: 2)")
 
 	f.String("database.type", string(DatabaseTypeSQLite), "Database type (sqlite, postgres)")
 
@@ -205,6 +206,7 @@ type RedditConfig struct {
 	ClientID          string `koanf:"client_id"`
 	ClientSecret      string `koanf:"client_secret"`
 	RequestsPerMinute int    `koanf:"requests_per_minute"`
+	MaxPages          int    `koanf:"max_pages"`
 }
 
 func (c RedditConfig) String() string {

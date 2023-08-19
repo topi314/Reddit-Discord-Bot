@@ -141,7 +141,7 @@ func (b *Bot) ListenSubreddits() {
 }
 
 func (b *Bot) checkSubscription(sub Subscription) {
-	posts, err := b.Reddit.GetPostsUntil(sub.Subreddit, sub.Type, sub.LastPost)
+	posts, err := b.Reddit.GetPostsUntil(sub.Subreddit, sub.Type, sub.LastPost, b.Cfg.Reddit.MaxPages)
 	if err != nil {
 		log.Errorf("error getting posts for subreddit %s: %s", sub.Subreddit, err.Error())
 		if errors.Is(err, ErrSubredditNotFound) || errors.Is(err, ErrSubredditForbidden) {

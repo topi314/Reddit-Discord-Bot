@@ -22,6 +22,7 @@ reddit:
   client_id: ...
   client_secret: ...
   requests_per_minute: 59
+  max_pages: 2
 
 database:
   type: sqlite
