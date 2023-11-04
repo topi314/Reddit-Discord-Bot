@@ -10,11 +10,11 @@ The bot does not require any permissions and can't do anything in your Discord. 
 <details>
 <summary>Table of Contents</summary>
 
+- [Public Bot](#public-bot)
 - [Usage](#usage)
 	- [Add Subreddit](#add-subreddit)
 	- [Remove Subreddit](#remove-subreddit)
 	- [List Subreddits](#list-subreddits)
-- [Public Bot](#public-bot)
 - [Self-hosted](#self-hosted)
 	- [Binary](#binary)
 	- [Docker-Compose](#docker-compose)
@@ -24,6 +24,10 @@ The bot does not require any permissions and can't do anything in your Discord. 
 - [Contact](#contact)
 
 </details>
+
+## Public Bot
+
+Invite the bot [here](https://discord.com/oauth2/authorize?client_id=846396249241288796&scope=applications.commands)
 
 ## Usage
 
@@ -64,10 +68,6 @@ To list all subreddit subscriptions run
 ```bash
 /reddit list (channel)
 ```
-
-## Public Bot
-
-Invite the bot [here](https://discord.com/oauth2/authorize?client_id=846396249241288796&scope=applications.commands)
 
 ## Self-hosted
 
