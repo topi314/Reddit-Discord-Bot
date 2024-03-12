@@ -25,7 +25,7 @@ var (
 	ErrSubredditForbidden = errors.New("subreddit forbidden")
 )
 
-var imageRegex = regexp.MustCompile(`https://.*\.(?:jpg|gif|png)`)
+var imageRegex = regexp.MustCompile(`https://.*\.(?:jpg|jpeg|gif|png)`)
 
 func (b *Bot) AddSubscription(sub Subscription) error {
 	if err := b.DB.AddSubscription(sub); err != nil {
