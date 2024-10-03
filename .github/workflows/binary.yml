@@ -2,6 +2,8 @@ name: Binary Release
 
 on:
   push:
+  release:
+    types: [ published ]
 
 jobs:
   build:
