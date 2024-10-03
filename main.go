@@ -15,8 +15,9 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/topi314/reddit-discord-bot/v2/redditbot"
 	"golang.org/x/oauth2"
+
+	"github.com/topi314/reddit-discord-bot/v2/redditbot"
 )
 
 var (

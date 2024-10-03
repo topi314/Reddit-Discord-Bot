@@ -19,14 +19,14 @@ jobs:
             goarch: arm
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.22.x
+          go-version: 1.23.x
           cache: true
 
       - name: File Extension Windows
@@ -46,7 +46,7 @@ jobs:
           go build -ldflags "-X main.Version=${{ env.VERSION }} -X main.Commit=${{ env.COMMIT }}" -o reddit-discord-bot-${{ matrix.goos }}-${{ matrix.goarch }}${{ env.file_name }} github.com/topi314/reddit-discord-bot/v2
 
       - name: Upload
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: reddit-discord-bot ${{ matrix.goos }} ${{ matrix.goarch }}
           path: reddit-discord-bot-*
