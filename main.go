@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	_ "embed"
-	"math/rand"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,10 +13,7 @@ import (
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
-	"github.com/disgoorg/disgo/discord"
-	"github.com/disgoorg/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"golang.org/x/oauth2"
 
 	"github.com/topi314/reddit-discord-bot/v2/redditbot"
 )
@@ -34,59 +32,44 @@ var (
 )
 
 func main() {
-	log.Infof("starting reddit-discord-bot version: %s (%s)", Version, Commit)
+	slog.Info("starting reddit-discord-bot...", slog.String("version", Version), slog.String("commit", Commit))
 	cfg, err := redditbot.ReadConfig()
 	if err != nil {
-		log.Fatal("error reading config:", err.Error())
+		slog.Error("error reading config", slog.Any("err", err))
+		return
 	}
 
-	log.SetLevel(cfg.Log.Level)
-	log.SetFlags(cfg.Log.Flags())
+	if err = setupLogger(cfg.Log); err != nil {
+		slog.Error("error setting up logger", slog.Any("err", err))
+		return
+	}
 
-	log.Info("Config:", cfg)
+	slog.Info("loaded config", slog.String("config", cfg.String()))
 	if err = cfg.Validate(); err != nil {
-		log.Fatalf(err.Error())
+		slog.Error("error validating config", slog.Any("err", err))
+		return
 	}
 
 	client, err := disgo.New(cfg.Discord.Token,
 		bot.WithDefaultGateway(),
 	)
 	if err != nil {
-		log.Fatal("error creating client:", err.Error())
+		slog.Error("error creating client", slog.Any("err", err))
+		return
 	}
 
-	reddit, err := redditbot.NewReddit(cfg.Reddit)
+	reddit, err := redditbot.NewReddit(cfg.Reddit, Version)
 	if err != nil {
-		log.Fatal("error creating reddit client:", err.Error())
+		slog.Error("error creating reddit client", slog.Any("err", err))
+		return
 	}
 
 	db, err := redditbot.NewDB(cfg.Database, schema)
 	if err != nil {
-		log.Fatal("error creating database client:", err.Error())
+		slog.Error("error creating database client", slog.Any("err", err))
 	}
 
-	b := redditbot.Bot{
-		Cfg:        cfg,
-		RedditIcon: redditIcon,
-		Client:     client,
-		Reddit:     reddit,
-		DB:         db,
-		Rand:       rand.New(rand.NewSource(time.Now().UnixNano())),
-		DiscordConfig: &oauth2.Config{
-			ClientID:     client.ApplicationID().String(),
-			ClientSecret: cfg.Discord.ClientSecret,
-			Endpoint: oauth2.Endpoint{
-				AuthURL:   "https://discord.com/api/oauth2/authorize",
-				TokenURL:  "https://discord.com/api/oauth2/token",
-				AuthStyle: oauth2.AuthStyleInParams,
-			},
-			RedirectURL: cfg.Server.RedirectURL,
-			Scopes: []string{
-				string(discord.OAuth2ScopeWebhookIncoming),
-			},
-		},
-		States: map[string]redditbot.SetupState{},
-	}
+	b := redditbot.New(cfg, redditIcon, client, reddit, db)
 	defer b.Close()
 
 	if cfg.Metrics.Enabled {
@@ -111,31 +94,62 @@ func main() {
 
 	if cfg.Discord.SyncCommands {
 		if _, err = client.Rest().SetGlobalCommands(client.ApplicationID(), redditbot.Commands); err != nil {
-			log.Fatal("error setting global commands:", err.Error())
+			slog.Error("error setting global commands", slog.Any("err", err))
 		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err = client.OpenGateway(ctx); err != nil {
-		log.Fatal("error opening gateway:", err.Error())
+		slog.Error("error opening discord gateway", slog.Any("err", err))
 	}
 
 	go b.ListenSubreddits()
 
 	if cfg.Server.Enabled {
 		go b.ListenAndServe()
-		defer b.Server.Shutdown(context.Background())
+		defer func() {
+			sCtx, sCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer sCancel()
+			if sErr := b.Server.Shutdown(sCtx); sErr != nil {
+				slog.Error("error shutting down server", slog.Any("err", sErr))
+			}
+		}()
 	}
 
 	if cfg.Metrics.Enabled {
 		go b.ListenAndServeMetrics()
-		defer b.MetricsServer.Shutdown(context.Background())
+		defer func() {
+			mCtx, mCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer mCancel()
+			if mErr := b.MetricsServer.Shutdown(mCtx); mErr != nil {
+				slog.Error("error shutting down metrics server", slog.Any("err", mErr))
+			}
+		}()
 	}
 
-	defer log.Info("exiting...")
+	defer slog.Info("stopping reddit-discord-bot...")
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, syscall.SIGINT, syscall.SIGTERM)
 	<-s
+}
+
+func setupLogger(cfg redditbot.LogConfig) error {
+	options := &slog.HandlerOptions{
+		AddSource: cfg.AddSource,
+		Level:     cfg.Level,
+	}
+
+	var sHandler slog.Handler
+	switch cfg.Format {
+	case "json":
+		sHandler = slog.NewJSONHandler(os.Stdout, options)
+	case "text":
+		sHandler = slog.NewTextHandler(os.Stdout, options)
+	default:
+		return fmt.Errorf("unknown log format: %s", cfg.Format)
+	}
+	slog.SetDefault(slog.New(sHandler))
+	return nil
 }

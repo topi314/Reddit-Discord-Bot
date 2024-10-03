@@ -36,7 +36,7 @@ Invite the bot [here](https://discord.com/oauth2/authorize?client_id=84639624924
 To add a new subreddit run
 
 ```bash
-/reddit add <subreddit-name> (new/hot/top/rising) (embed/text)
+/reddit add <subreddit-name> (new/hot/top/rising) (embed/text/link) (role) (proxy)
 ```
 
 and click the returned link
@@ -48,7 +48,7 @@ select the server & channel in the discord popup & hit okay that's all!
 To update a subreddit run
 
 ```bash
-/reddit update <subreddit-name> (new/hot/top/rising) (embed/text)
+/reddit update <subreddit-name> (new/hot/top/rising) (embed/text/link) (role) (proxy)
 ```
 
 ### Remove Subreddit
@@ -92,7 +92,7 @@ Prerequisites:
 ```bash
 $ git clone git@github.com:topi314/Reddit-Discord-Bot.git
 $ cd Reddit-Discord-Bot
-$ go build -o reddit-discord-bot .
+$ go build -o reddit-discord-bot github.com/topi314/reddit-discord-bot/v2
 ```
 
 You can now run the bot with
@@ -167,7 +167,7 @@ If you encounter any problems feel free to open an issue or reach out to me(`toœ
 
 # License
 
-Reddit-Discord-Bot is licensed under the [Apache License 2.0](/LICENSE).
+Reddit-Discord-Bot is licensed under the [Apache License 2.0](LICENSE).
 
 # Contributing
 

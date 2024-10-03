@@ -8,5 +8,7 @@ CREATE TABLE IF NOT EXISTS subscriptions
 	webhook_id    BIGINT    NOT NULL,
 	webhook_token VARCHAR   NOT NULL,
 	last_post     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	role_id       BIGINT    NOT NULL DEFAULT 0,
+	reddit_proxy  VARCHAR   NOT NULL DEFAULT '',
 	PRIMARY KEY (subreddit, guild_id)
 )

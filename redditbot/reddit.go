@@ -3,18 +3,18 @@ package redditbot
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/disgoorg/json"
-	"github.com/disgoorg/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/oauth2"
 )
 
-func NewReddit(cfg RedditConfig) (*Reddit, error) {
+func NewReddit(cfg RedditConfig, version string) (*Reddit, error) {
 	reddit := &Reddit{
 		config: &oauth2.Config{
 			ClientID:     cfg.ClientID,
@@ -27,6 +27,7 @@ func NewReddit(cfg RedditConfig) (*Reddit, error) {
 		client: &http.Client{
 			Timeout: time.Second * 10,
 		},
+		userAgent: fmt.Sprintf("discord:com.github.topi314.reddit-discord-bot:%s (by /u/TobiDragneel)", version),
 	}
 
 	if _, err := reddit.getToken(); err != nil {
@@ -43,8 +44,9 @@ type rateLimit struct {
 }
 
 type Reddit struct {
-	config *oauth2.Config
-	client *http.Client
+	config    *oauth2.Config
+	client    *http.Client
+	userAgent string
 
 	rateLimit rateLimit
 	token     *oauth2.Token
@@ -70,7 +72,7 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	log.Debugf("rate limit: used: %d, remaining: %d, reset: %s\n", r.rateLimit.used, r.rateLimit.remaining, r.rateLimit.reset.Format(time.RFC3339))
+	slog.Debug("request", slog.Int("used", r.rateLimit.used), slog.Int("remaining", r.rateLimit.remaining), slog.Time("reset", r.rateLimit.reset))
 
 	now := time.Now()
 	limit := 10
@@ -89,7 +91,7 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 	}
 
 	rq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-	rq.Header.Set("User-Agent", "discord:com.github.topi314.reddit-discord-bot:1.0.0 (by /u/TobiDragneel)")
+	rq.Header.Set("User-Agent", r.userAgent)
 
 	rs, err := r.client.Do(rq)
 	if err != nil {
@@ -99,17 +101,17 @@ func (r *Reddit) do(rq *http.Request, important bool) (*http.Response, error) {
 	headers := rs.Header
 	used, err := strconv.ParseFloat(headers.Get("X-Ratelimit-Used"), 64)
 	if err != nil {
-		log.Error("error parsing x-ratelimit-used:", err.Error())
+		slog.Error("error parsing x-ratelimit-used", slog.Any("err", err))
 		used = float64(r.rateLimit.used + 1)
 	}
 	remaining, err := strconv.ParseFloat(headers.Get("X-Ratelimit-Remaining"), 64)
 	if err != nil {
-		log.Error("error parsing x-ratelimit-remaining:", err.Error())
+		slog.Error("error parsing x-ratelimit-remaining", slog.Any("err", err))
 		remaining = float64(r.rateLimit.remaining - 1)
 	}
 	reset, err := strconv.ParseFloat(headers.Get("X-Ratelimit-Reset"), 64)
 	if err != nil {
-		log.Error("error parsing x-ratelimit-reset:", err.Error())
+		slog.Error("error parsing x-ratelimit-reset", slog.Any("err", err))
 		reset = float64(r.rateLimit.reset.Unix())
 	}
 
@@ -171,7 +173,7 @@ func (r *Reddit) getPosts(subreddit string, fetchType string, after string) ([]R
 	if after != "" {
 		url += fmt.Sprintf("&after=%s", after)
 	}
-	log.Debug("getting posts for url: ", url)
+	slog.Debug("getting posts for", slog.String("url", url))
 	rq, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -181,7 +183,9 @@ func (r *Reddit) getPosts(subreddit string, fetchType string, after string) ([]R
 	if err != nil {
 		return nil, err
 	}
-	defer rs.Body.Close()
+	defer func() {
+		_ = rs.Body.Close()
+	}()
 
 	if rs.StatusCode == http.StatusNotFound {
 		return nil, ErrSubredditNotFound

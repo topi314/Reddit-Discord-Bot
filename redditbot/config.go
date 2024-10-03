@@ -3,10 +3,9 @@ package redditbot
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
-
-	"github.com/disgoorg/log"
 
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/env"
@@ -20,8 +19,10 @@ func ReadConfig() (Config, error) {
 
 	f.Bool("test_mode", false, "Test mode (default: false)")
 
-	f.Int("log.level", 2, "Log level (0: trace, 1: debug, 2: info, 3: warn, 4: error, 5: fatal, 6: panic)")
-	f.Bool("log.add_source", false, "Add source to log ")
+	f.String("log.level", slog.LevelInfo.String(), "Log level (debug, info, warn, error)")
+	f.String("log.format", string(LogFormatText), "Log format (text, json)")
+	f.Bool("log.add_source", false, "Add source to log")
+	f.Bool("log.no_color", false, "No color in log")
 
 	f.Bool("server.enabled", true, "Server enabled")
 	f.String("server.listen_addr", "0.0.0.0:8080", "Server listen address")
@@ -58,7 +59,7 @@ func ReadConfig() (Config, error) {
 	}
 
 	k := koanf.New(".")
-	log.Info("Loading config from:", *path)
+	slog.Info("Loading config", slog.String("path", *path))
 	if err := k.Load(file.Provider(*path), yaml.Parser()); err != nil {
 		return Config{}, err
 	}
@@ -119,31 +120,35 @@ func (c Config) Validate() error {
 	return nil
 }
 
+type LogFormat string
+
+const (
+	LogFormatText LogFormat = "text"
+	LogFormatJSON LogFormat = "json"
+)
+
 type LogConfig struct {
-	Level     log.Level `koanf:"level"`
-	AddSource bool      `koanf:"add_source"`
+	Level     slog.Level `koanf:"level"`
+	Format    LogFormat  `koanf:"format"`
+	AddSource bool       `koanf:"add_source"`
 }
 
 func (c LogConfig) String() string {
-	return fmt.Sprintf("\n  Level: %v\n  AddSource: %v",
+	return fmt.Sprintf("\n  Level: %v\n  Format: %s\n  AddSource: %t",
 		c.Level,
+		c.Format,
 		c.AddSource,
 	)
 }
 
 func (c LogConfig) Validate() error {
-	if c.Level != log.LevelTrace && c.Level != log.LevelDebug && c.Level != log.LevelInfo && c.Level != log.LevelWarn && c.Level != log.LevelError && c.Level != log.LevelFatal && c.Level != log.LevelPanic {
-		return fmt.Errorf("log.level must be one of: 0 (trace), 1 (debug), 2 (info), 3 (warn), 4 (error), 5 (fatal), 6 (panic)")
+	if c.Level != slog.LevelDebug && c.Level != slog.LevelInfo && c.Level != slog.LevelWarn && c.Level != slog.LevelError {
+		return fmt.Errorf("log.level must be one of: debug, info, warn, error")
+	}
+	if c.Format != LogFormatText && c.Format != LogFormatJSON {
+		return fmt.Errorf("log.format must be one of: text, json")
 	}
 	return nil
-}
-
-func (c LogConfig) Flags() int {
-	flags := log.LstdFlags
-	if c.AddSource {
-		flags |= log.Lshortfile
-	}
-	return flags
 }
 
 type ServerConfig struct {

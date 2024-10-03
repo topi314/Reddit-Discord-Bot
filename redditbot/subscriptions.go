@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -13,12 +14,14 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
-	"github.com/disgoorg/log"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const RedditColor = 0xff581a
+const (
+	redditColor        = 0xff581a
+	defaultRedditProxy = "https://reddit.com"
+)
 
 var (
 	ErrSubredditNotFound  = errors.New("subreddit not found")
@@ -28,7 +31,7 @@ var (
 var imageRegex = regexp.MustCompile(`https://.*\.(?:jpg|jpeg|gif|png)`)
 
 func (b *Bot) AddSubscription(sub Subscription) error {
-	if err := b.DB.AddSubscription(sub); err != nil {
+	if err := b.db.AddSubscription(sub); err != nil {
 		return err
 	}
 
@@ -50,7 +53,7 @@ func (b *Bot) RemoveSubscription(webhookID snowflake.ID, webhookToken string, er
 				{
 					Title:       "Error",
 					Timestamp:   json.Ptr(time.Now()),
-					Color:       RedditColor,
+					Color:       redditColor,
 					Description: fmt.Sprintf("An error occurred while trying to get posts from this subreddit: %s\nRemoving this webhook" + err.Error()),
 				},
 			},
@@ -63,7 +66,7 @@ func (b *Bot) RemoveSubscription(webhookID snowflake.ID, webhookToken string, er
 	}
 	_ = b.Client.Rest().DeleteWebhookWithToken(webhookID, webhookToken, rest.WithReason("Removing webhook because of error: "+errMessage))
 
-	sub, err := b.DB.RemoveSubscription(webhookID)
+	sub, err := b.db.RemoveSubscription(webhookID)
 	if err != nil {
 		return err
 	}
@@ -80,7 +83,7 @@ func (b *Bot) RemoveSubscription(webhookID snowflake.ID, webhookToken string, er
 }
 
 func (b *Bot) RemoveSubscriptionByGuildSubreddit(guildID snowflake.ID, subreddit string, reason string) error {
-	sub, err := b.DB.RemoveSubscriptionByGuildSubreddit(guildID, subreddit)
+	sub, err := b.db.RemoveSubscriptionByGuildSubreddit(guildID, subreddit)
 	if err != nil {
 		return err
 	}
@@ -99,26 +102,26 @@ func (b *Bot) RemoveSubscriptionByGuildSubreddit(guildID snowflake.ID, subreddit
 }
 
 func (b *Bot) targetTime() time.Duration {
-	return time.Minute / time.Duration(b.Cfg.Reddit.RequestsPerMinute)
+	return time.Minute / time.Duration(b.cfg.Reddit.RequestsPerMinute)
 }
 
 func (b *Bot) ListenSubreddits() {
 	for {
 		now := time.Now()
-		subscriptions, err := b.DB.GetAllSubscriptionIDs()
+		subscriptions, err := b.db.GetAllSubscriptionIDs()
 		if err != nil {
-			log.Error("error getting subscriptions:", err.Error())
+			slog.Error("error getting subscriptions", slog.Any("err", err))
 			continue
 		}
-		log.Debugf("checking subreddits for %d subscriptions", len(subscriptions))
+		slog.Debug("checking subreddits for subscriptions", slog.Int("subscriptions", len(subscriptions)))
 
 		for i := range subscriptions {
 			subNow := time.Now()
-			sub, err := b.DB.GetSubscription(subscriptions[i])
+			sub, err := b.db.GetSubscription(subscriptions[i])
 			if errors.Is(err, ErrSubscriptionNotFound) {
 				continue
 			} else if err != nil {
-				log.Errorf("error checking subscription for webhook %s: %s", subscriptions[i], err.Error())
+				slog.Error("error checking subscription for webhook", slog.String("webhook_id", subscriptions[i].String()), slog.Any("err", err))
 				continue
 			}
 
@@ -126,32 +129,32 @@ func (b *Bot) ListenSubreddits() {
 
 			waitTime := b.targetTime() - time.Now().Sub(subNow)
 			if waitTime > 0 {
-				log.Debugf("waiting %s before checking next sub", waitTime.String())
+				slog.Debug("waiting before checking next sub", slog.String("wait_time", waitTime.String()))
 				<-time.After(waitTime)
 			}
 		}
 
 		duration := time.Now().Sub(now)
 		if duration > time.Duration(len(subscriptions))*b.targetTime() {
-			log.Debugf("took %s too long to check %d subreddits", duration.String(), len(subscriptions))
+			slog.Debug("took too long to check subreddits", slog.String("duration", duration.String()), slog.Int("subscriptions", len(subscriptions)))
 		}
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
 
 func (b *Bot) checkSubscription(sub Subscription) {
-	posts, err := b.Reddit.GetPostsUntil(sub.Subreddit, sub.Type, sub.LastPost, b.Cfg.Reddit.MaxPages)
+	posts, err := b.reddit.GetPostsUntil(sub.Subreddit, sub.Type, sub.LastPost, b.cfg.Reddit.MaxPages)
 	if err != nil {
-		log.Errorf("error getting posts for subreddit %s: %s", sub.Subreddit, err.Error())
+		slog.Error("error getting posts for subreddit", slog.String("subreddit", sub.Subreddit), slog.Any("err", err))
 		if errors.Is(err, ErrSubredditNotFound) || errors.Is(err, ErrSubredditForbidden) {
 			if err = b.RemoveSubscription(sub.WebhookID, sub.WebhookToken, err); err != nil {
-				log.Errorf("error removing sub for webhook %s: %s", sub.WebhookID, err.Error())
+				slog.Error("error removing sub for webhook", slog.String("webhook_id", sub.WebhookID.String()), slog.Any("err", err))
 			}
 		}
 		return
 	}
-	log.Debugf("got %d posts for subreddit %s before: %s\n", len(posts), sub.Subreddit, sub.LastPost)
+	slog.Debug("got posts for subreddit before:", slog.String("subreddit", sub.Subreddit), slog.Int("posts", len(posts)), slog.Time("last_post", sub.LastPost))
 
 	for i := len(posts) - 1; i >= 0; i-- {
 		if !b.sendPost(sub, posts[i]) {
@@ -160,8 +163,8 @@ func (b *Bot) checkSubscription(sub Subscription) {
 	}
 
 	if len(posts) > 0 {
-		if err = b.DB.UpdateSubscriptionLastPost(sub.WebhookID, time.Unix(int64(posts[0].CreatedUtc), 0)); err != nil {
-			log.Errorf("error updating last post for webhook %s: %s", sub.WebhookID, err.Error())
+		if err = b.db.UpdateSubscriptionLastPost(sub.WebhookID, time.Unix(int64(posts[0].CreatedUtc), 0)); err != nil {
+			slog.Error("error updating last post for webhook", slog.String("webhook_id", sub.WebhookID.String()), slog.Any("err", err))
 		}
 	}
 }
@@ -175,7 +178,7 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 			Description: cutString(html.UnescapeString(post.Selftext), 4069),
 			URL:         "https://reddit.com" + post.Permalink,
 			Timestamp:   json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
-			Color:       RedditColor,
+			Color:       redditColor,
 			Author: &discord.EmbedAuthor{
 				Name:    fmt.Sprintf("%s post in %s", strings.Title(sub.Type), post.SubredditNamePrefixed),
 				URL:     "https://reddit.com/" + post.SubredditNamePrefixed,
@@ -195,8 +198,27 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 			Embeds: []discord.Embed{embed},
 		}
 	case FormatTypeText:
+		proxy := defaultRedditProxy
+		if sub.RedditProxy != "" {
+			proxy = sub.RedditProxy
+		}
 		webhookMessageCreate = discord.WebhookMessageCreate{
-			Content: fmt.Sprintf("## [%s](https://reddit.com%s)\n%s", post.Title, post.Permalink, cutString(quoteString(html.UnescapeString(post.Selftext)), 4000)),
+			Content: fmt.Sprintf("## [%s](%s%s)\n%s", post.Title, proxy, post.Permalink, cutString(quoteString(html.UnescapeString(post.Selftext)), 4000)),
+		}
+	case FormatTypeLink:
+		proxy := defaultRedditProxy
+		if sub.RedditProxy != "" {
+			proxy = sub.RedditProxy
+		}
+		webhookMessageCreate = discord.WebhookMessageCreate{
+			Content: fmt.Sprintf("[%s](%s%s)", post.Title, proxy, post.Permalink),
+		}
+	}
+
+	if sub.RoleID != 0 {
+		webhookMessageCreate.Content = discord.RoleMention(sub.RoleID) + "\n" + webhookMessageCreate.Content
+		webhookMessageCreate.AllowedMentions = &discord.AllowedMentions{
+			Roles: []snowflake.ID{sub.RoleID},
 		}
 	}
 
@@ -208,8 +230,8 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 		"channel_id": strconv.FormatUint(uint64(sub.ChannelID), 10),
 	}).Inc()
 
-	if b.Cfg.TestMode {
-		log.Debugf("sending post to webhook %d: %s", sub.WebhookID, post.Title)
+	if b.cfg.TestMode {
+		slog.Debug("sending post to webhook", slog.String("webhook_id", sub.WebhookID.String()), slog.Any("post", post))
 		return true
 	}
 
@@ -217,11 +239,11 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 		var restError rest.Error
 		if errors.As(err, &restError) && restError.Response.StatusCode == http.StatusNotFound {
 			if err = b.RemoveSubscription(sub.WebhookID, sub.WebhookToken, nil); err != nil {
-				log.Errorf("error removing sub for webhook %s: %s", sub.WebhookID, err.Error())
+				slog.Error("error removing sub for webhook", slog.String("webhook_id", sub.WebhookID.String()), slog.Any("err", err))
 			}
 			return false
 		}
-		log.Errorf("error sending post to webhook %d: %s", sub.WebhookID, err.Error())
+		slog.Error("error sending post to webhook", slog.String("webhook_id", sub.WebhookID.String()), slog.Any("err", err))
 	}
 
 	return true

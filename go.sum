@@ -11,8 +11,6 @@ github.com/disgoorg/disgo v0.18.13 h1:RswLnakVS+RbCACBfK7mLv3YGdZh625N2SMnngnqd+
 github.com/disgoorg/disgo v0.18.13/go.mod h1:wZ/ZW6x43QivIVrYrJxwSeFbIbrMqpi5vAU1ovsod8o=
 github.com/disgoorg/json v1.2.0 h1:6e/j4BCfSHIvucG1cd7tJPAOp1RgnnMFSqkvZUtEd1Y=
 github.com/disgoorg/json v1.2.0/go.mod h1:BHDwdde0rpQFDVsRLKhma6Y7fTbQKub/zdGO5O9NqqA=
-github.com/disgoorg/log v1.2.1 h1:kZYAWkUBcGy4LbZcgYtgYu49xNVLy+xG5Uq3yz5VVQs=
-github.com/disgoorg/log v1.2.1/go.mod h1:hhQWYTFTnIGzAuFPZyXJEi11IBm9wq+/TVZt/FEwX0o=
 github.com/disgoorg/snowflake/v2 v2.0.3 h1:3B+PpFjr7j4ad7oeJu4RlQ+nYOTadsKapJIzgvSI2Ro=
 github.com/disgoorg/snowflake/v2 v2.0.3/go.mod h1:W6r7NUA7DwfZLwr00km6G4UnZ0zcoLBRufhkFWgAc4c=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=

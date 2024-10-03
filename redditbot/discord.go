@@ -17,18 +17,19 @@ var typeChoices = []discord.ApplicationCommandOptionChoiceString{
 		Name:  "New",
 		Value: "new",
 	},
-	{
-		Name:  "Hot",
-		Value: "hot",
-	},
-	{
-		Name:  "Top",
-		Value: "top",
-	},
-	{
-		Name:  "Rising",
-		Value: "rising",
-	},
+	// This does not seem to work like it should
+	// {
+	// 	Name:  "Hot",
+	// 	Value: "hot",
+	// },
+	// {
+	// 	Name:  "Top",
+	// 	Value: "top",
+	// },
+	// {
+	// 	Name:  "Rising",
+	// 	Value: "rising",
+	// },
 }
 
 var formatTypeChoices = []discord.ApplicationCommandOptionChoiceString{
@@ -39,6 +40,10 @@ var formatTypeChoices = []discord.ApplicationCommandOptionChoiceString{
 	{
 		Name:  strings.Title(string(FormatTypeText)),
 		Value: string(FormatTypeText),
+	},
+	{
+		Name:  strings.Title(string(FormatTypeLink)),
+		Value: string(FormatTypeLink),
 	},
 }
 
@@ -68,6 +73,16 @@ var Commands = []discord.ApplicationCommandCreate{
 						Required:    false,
 						Choices:     formatTypeChoices,
 					},
+					discord.ApplicationCommandOptionRole{
+						Name:        "role",
+						Description: "the role to ping when a post is sent",
+						Required:    false,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "proxy",
+						Description: "the proxy to use for the post links such as: https://rxddit.com",
+						Required:    false,
+					},
 				},
 			},
 			discord.ApplicationCommandOptionSubCommand{
@@ -90,6 +105,16 @@ var Commands = []discord.ApplicationCommandCreate{
 						Description: "how to format the subreddit posts",
 						Required:    false,
 						Choices:     formatTypeChoices,
+					},
+					discord.ApplicationCommandOptionRole{
+						Name:        "role",
+						Description: "the role to ping when a post is sent",
+						Required:    false,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "proxy",
+						Description: "the proxy to use for the post links such as: https://rxddit.com",
+						Required:    false,
 					},
 				},
 			},
@@ -153,8 +178,10 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	if !ok {
 		formatType = "embed"
 	}
+	roleID := data.Snowflake("role")
+	proxy := data.String("proxy")
 
-	ok, err := b.DB.HasSubscriptionByGuildSubreddit(*event.GuildID(), subreddit)
+	ok, err := b.db.HasSubscriptionByGuildSubreddit(*event.GuildID(), subreddit)
 	if err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Failed to check if you are already subscribed to this subreddit: " + err.Error(),
@@ -164,13 +191,13 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	}
 	if ok {
 		_ = event.CreateMessage(discord.MessageCreate{
-			Content: fmt.Sprintf("You are already subscribed to r/%s", subreddit),
+			Content: fmt.Sprintf("You are already subscribed to `r/%s`", subreddit),
 			Flags:   discord.MessageFlagEphemeral,
 		})
 		return
 	}
 
-	if err = b.Reddit.CheckSubreddit(subreddit); err != nil {
+	if err = b.reddit.CheckSubreddit(subreddit); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Invalid subreddit: " + err.Error(),
 			Flags:   discord.MessageFlagEphemeral,
@@ -178,18 +205,20 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		return
 	}
 
-	if b.Cfg.Server.Enabled {
+	if b.cfg.Server.Enabled {
 		state := b.randomString(16)
-		url := b.DiscordConfig.AuthCodeURL(state)
+		url := b.discordConfig.AuthCodeURL(state)
 
-		b.States[state] = SetupState{
+		b.states[state] = SetupState{
 			Subreddit:   subreddit,
 			PostType:    postType,
 			FormatType:  FormatType(formatType),
+			RoleID:      roleID,
+			RedditProxy: proxy,
 			Interaction: event.ApplicationCommandInteraction,
 		}
 		_ = event.CreateMessage(discord.MessageCreate{
-			Content: fmt.Sprintf("Click the button to add a webhook for the subreddit %s", subreddit),
+			Content: fmt.Sprintf("Click the button to add a webhook for the subreddit `%s`", subreddit),
 			Components: []discord.ContainerComponent{
 				discord.ActionRowComponent{
 					discord.NewLinkButton("Add Webhook", url),
@@ -202,7 +231,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 
 	webhook, err := b.Client.Rest().CreateWebhook(event.Channel().ID(), discord.WebhookCreate{
 		Name:   subreddit,
-		Avatar: discord.NewIconRaw(discord.IconTypePNG, b.RedditIcon),
+		Avatar: discord.NewIconRaw(discord.IconTypePNG, b.redditIcon),
 	})
 	if err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
@@ -213,7 +242,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	}
 
 	if _, err = b.Client.Rest().CreateWebhookMessage(webhook.ID(), webhook.Token, discord.WebhookMessageCreate{
-		Content: fmt.Sprintf("Added subscription for [r/%s](https://reddit.com/r/%s)", subreddit, subreddit),
+		Content: fmt.Sprintf("Added subscription for %s", formatSubreddit(subreddit)),
 	}, true, 0); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Failed to send test message to webhook: " + err.Error(),
@@ -222,7 +251,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		return
 	}
 
-	if err = b.DB.AddSubscription(Subscription{
+	if err = b.db.AddSubscription(Subscription{
 		Subreddit:    subreddit,
 		Type:         postType,
 		FormatType:   FormatType(formatType),
@@ -239,7 +268,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{
-		Content: fmt.Sprintf("Subscribed to [r/%s](<https://reddit.com/r/%s>)", subreddit, subreddit),
+		Content: fmt.Sprintf("Subscribed to %s)", formatSubreddit(subreddit)),
 	})
 }
 
@@ -247,9 +276,11 @@ func (b *Bot) OnSubredditUpdate(data discord.SlashCommandInteractionData, event 
 	subreddit := data.String("subreddit")
 	postType := data.String("type")
 	formatType := FormatType(data.String("format-type"))
+	roleID := data.Snowflake("role")
+	proxy := data.String("proxy")
 
-	sub, err := b.DB.GetSubscriptionsByGuildSubreddit(*event.GuildID(), subreddit)
-	if err == ErrSubscriptionNotFound {
+	sub, err := b.db.GetSubscriptionsByGuildSubreddit(*event.GuildID(), subreddit)
+	if errors.Is(err, ErrSubscriptionNotFound) {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: fmt.Sprintf("You are not subscribed to r/%s", subreddit),
 			Flags:   discord.MessageFlagEphemeral,
@@ -270,8 +301,14 @@ func (b *Bot) OnSubredditUpdate(data discord.SlashCommandInteractionData, event 
 	if formatType == "" {
 		formatType = sub.FormatType
 	}
+	if roleID != 0 {
+		roleID = sub.RoleID
+	}
+	if proxy == "" {
+		proxy = sub.RedditProxy
+	}
 
-	if err = b.DB.UpdateSubscription(sub.WebhookID, postType, formatType); err != nil {
+	if err = b.db.UpdateSubscription(sub.WebhookID, postType, formatType, roleID, proxy); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Failed to update subscription: " + err.Error(),
 			Flags:   discord.MessageFlagEphemeral,
@@ -280,7 +317,7 @@ func (b *Bot) OnSubredditUpdate(data discord.SlashCommandInteractionData, event 
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{
-		Content: fmt.Sprintf("Updated subscription for [r/%s](https://reddit.com/r/%s)", subreddit, subreddit),
+		Content: fmt.Sprintf("Updated subscription for %s", formatSubreddit(subreddit)),
 		Flags:   discord.MessageFlagEphemeral,
 	})
 }
@@ -309,9 +346,9 @@ func (b *Bot) OnSubredditList(data discord.SlashCommandInteractionData, event *e
 	)
 
 	if channel, ok := data.OptChannel("channel"); ok {
-		subs, err = b.DB.GetSubscriptionsByChannel(channel.ID)
+		subs, err = b.db.GetSubscriptionsByChannel(channel.ID)
 	} else {
-		subs, err = b.DB.GetSubscriptionsByGuild(*event.GuildID())
+		subs, err = b.db.GetSubscriptionsByGuild(*event.GuildID())
 	}
 	if err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
@@ -331,12 +368,21 @@ func (b *Bot) OnSubredditList(data discord.SlashCommandInteractionData, event *e
 
 	content := fmt.Sprintf("# Subscriptions(%d):\n", len(subs))
 	for _, sub := range subs {
-		content += fmt.Sprintf("- `%s` - `%s` - [r/%s](<https://reddit.com/r/%s>)\n", strings.Title(sub.Type), strings.Title(string(sub.FormatType)), sub.Subreddit, sub.Subreddit)
+		role := "`none`"
+		if sub.RoleID != 0 {
+			role = fmt.Sprintf("<@%s>", sub.RoleID)
+		}
+		proxy := "`none`"
+		if sub.RedditProxy != "" {
+			proxy = fmt.Sprintf("`%s`", sub.RedditProxy)
+		}
+		content += fmt.Sprintf("- `%s` - `%s` - %s - %s- %s\n", strings.Title(sub.Type), strings.Title(string(sub.FormatType)), role, proxy, formatSubreddit(sub.Subreddit))
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{
-		Content: content,
-		Flags:   discord.MessageFlagEphemeral,
+		Content:         content,
+		Flags:           discord.MessageFlagEphemeral,
+		AllowedMentions: &discord.AllowedMentions{},
 	})
 }
 
@@ -352,13 +398,13 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 	state := query.Get("state")
 	code := query.Get("code")
 
-	setupState, ok := b.States[state]
+	setupState, ok := b.states[state]
 	if !ok {
 		http.Error(w, "invalid state", http.StatusBadRequest)
 		return
 	}
-	defer delete(b.States, state)
-	token, err := b.DiscordConfig.Exchange(r.Context(), code)
+	defer delete(b.states, state)
+	token, err := b.discordConfig.Exchange(r.Context(), code)
 	if err != nil {
 		_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 			Content:    json.Ptr("Error while exchanging code: " + err.Error()),
@@ -382,7 +428,7 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 	webhookID := snowflake.MustParse(wh["id"].(string))
 	webhookToken := wh["token"].(string)
 
-	if err = b.DB.AddSubscription(Subscription{
+	if err = b.db.AddSubscription(Subscription{
 		Subreddit:    setupState.Subreddit,
 		Type:         setupState.PostType,
 		FormatType:   setupState.FormatType,
@@ -390,6 +436,8 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 		ChannelID:    setupState.Interaction.Channel().ID(),
 		WebhookID:    webhookID,
 		WebhookToken: webhookToken,
+		RoleID:       setupState.RoleID,
+		RedditProxy:  setupState.RedditProxy,
 	}); err != nil {
 		_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 			Content:    json.Ptr("Failed to save subscription to the database: " + err.Error()),
@@ -400,7 +448,7 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err = b.Client.Rest().CreateWebhookMessage(webhookID, webhookToken, discord.WebhookMessageCreate{
-		Content: fmt.Sprintf("Added subscription for [r/%s](https://reddit.com/r/%s)", setupState.Subreddit, setupState.Subreddit),
+		Content: fmt.Sprintf("Added subscription for %s", formatSubreddit(setupState.Subreddit)),
 	}, true, 0); err != nil {
 		_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 			Content:    json.Ptr("Failed to send test message to webhook: " + err.Error()),
@@ -409,10 +457,14 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	delete(b.States, state)
+	delete(b.states, state)
 	_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
-		Content:    json.Ptr(fmt.Sprintf("Subscribed to [r/%s](<https://reddit.com/r/%s>)", setupState.Subreddit, setupState.Subreddit)),
+		Content:    json.Ptr(fmt.Sprintf("Subscribed to %s)", formatSubreddit(setupState.Subreddit))),
 		Components: &[]discord.ContainerComponent{},
 	})
-	w.Write([]byte("success, you can close this window now"))
+	_, _ = w.Write([]byte("success, you can close this window now"))
+}
+
+func formatSubreddit(subreddit string) string {
+	return fmt.Sprintf("[`r/%s`](https://reddit.com/r/%s)", subreddit, subreddit)
 }

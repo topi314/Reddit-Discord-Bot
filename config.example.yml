@@ -2,8 +2,9 @@
 test_mode: false
 
 log:
-  # 0: trace, 1: debug, 2: info, 3: warn, 4: error, 5: fatal, 6: panic
-  level: 2
+  # debug, info, warn, error
+  level: info
+  format: text
   add_source: true
 
 # disable the server if you don't want to rely on an oauth2 flow to create the webhook
