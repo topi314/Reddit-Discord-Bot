@@ -301,7 +301,7 @@ func (b *Bot) OnSubredditUpdate(data discord.SlashCommandInteractionData, event 
 	if formatType == "" {
 		formatType = sub.FormatType
 	}
-	if roleID != 0 {
+	if roleID == 0 {
 		roleID = sub.RoleID
 	}
 	if proxy == "" {
