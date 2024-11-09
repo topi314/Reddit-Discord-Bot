@@ -216,10 +216,24 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 	}
 
 	if sub.RoleID != 0 {
-		webhookMessageCreate.Content = discord.RoleMention(sub.RoleID) + "\n" + webhookMessageCreate.Content
-		webhookMessageCreate.AllowedMentions = &discord.AllowedMentions{
-			Roles: []snowflake.ID{sub.RoleID},
+		var (
+			mentionContent  string
+			allowedMentions discord.AllowedMentions
+		)
+		if sub.RoleID == sub.GuildID {
+			mentionContent = "@everyone"
+			allowedMentions = discord.AllowedMentions{
+				Parse: []discord.AllowedMentionType{discord.AllowedMentionTypeEveryone},
+			}
+		} else {
+			mentionContent = discord.RoleMention(sub.RoleID)
+			allowedMentions = discord.AllowedMentions{
+				Roles: []snowflake.ID{sub.RoleID},
+			}
 		}
+
+		webhookMessageCreate.Content = mentionContent + "\n" + webhookMessageCreate.Content
+		webhookMessageCreate.AllowedMentions = &allowedMentions
 	}
 
 	postsSent.With(prometheus.Labels{
