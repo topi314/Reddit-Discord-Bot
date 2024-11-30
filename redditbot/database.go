@@ -34,6 +34,7 @@ type Subscription struct {
 	LastPost     time.Time    `db:"last_post"`
 	RoleID       snowflake.ID `db:"role_id"`
 	RedditProxy  string       `db:"reddit_proxy"`
+	LinkButton   bool         `db:"link_button"`
 }
 
 func NewDB(cfg DatabaseConfig, schema string) (*DB, error) {
@@ -73,12 +74,12 @@ func (d *DB) Close() error {
 }
 
 func (d *DB) AddSubscription(sub Subscription) error {
-	_, err := d.dbx.NamedExec(`INSERT INTO subscriptions (subreddit, format_type, guild_id, channel_id, webhook_id, webhook_token, role_id, reddit_proxy) VALUES (:subreddit, :format_type, :guild_id, :channel_id, :webhook_id, :webhook_token, :role_id, :reddit_proxy)`, sub)
+	_, err := d.dbx.NamedExec(`INSERT INTO subscriptions (subreddit, format_type, guild_id, channel_id, webhook_id, webhook_token, role_id, reddit_proxy, link_button) VALUES (:subreddit, :format_type, :guild_id, :channel_id, :webhook_id, :webhook_token, :role_id, :reddit_proxy, :link_button)`, sub)
 	return err
 }
 
-func (d *DB) UpdateSubscription(webhookID snowflake.ID, postType string, formatType FormatType, roleID snowflake.ID, redditProxy string) error {
-	_, err := d.dbx.Exec(`UPDATE subscriptions SET type = $1, format_type = $2, role_id = $3, reddit_proxy = $4 WHERE webhook_id = $5`, postType, formatType, roleID, redditProxy, webhookID)
+func (d *DB) UpdateSubscription(webhookID snowflake.ID, postType string, formatType FormatType, roleID snowflake.ID, redditProxy string, linkButton bool) error {
+	_, err := d.dbx.Exec(`UPDATE subscriptions SET type = $1, format_type = $2, role_id = $3, reddit_proxy = $4, link_button = $5 WHERE webhook_id = $6`, postType, formatType, roleID, redditProxy, linkButton, webhookID)
 	return err
 }
 

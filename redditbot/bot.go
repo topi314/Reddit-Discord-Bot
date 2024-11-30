@@ -45,6 +45,7 @@ type SetupState struct {
 	FormatType  FormatType
 	RoleID      snowflake.ID
 	RedditProxy string
+	LinkButton  bool
 	Interaction discord.ApplicationCommandInteraction
 }
 
