@@ -211,7 +211,7 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 			proxy = sub.RedditProxy
 		}
 		webhookMessageCreate = discord.WebhookMessageCreate{
-			Content: fmt.Sprintf("[%s](%s%s)", post.Title, proxy, post.Permalink),
+			Content: fmt.Sprintf("New [post](%s%s) in [`%s`](<%s>)", proxy, post.Permalink, post.SubredditNamePrefixed, "https://reddit.com/"+post.SubredditNamePrefixed),
 		}
 	}
 
@@ -236,6 +236,14 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 		webhookMessageCreate.AllowedMentions = &allowedMentions
 	}
 
+	if sub.LinkButton {
+		webhookMessageCreate.Components = []discord.ContainerComponent{
+			discord.ActionRowComponent{
+				discord.NewLinkButton("Open Post", "https://reddit.com"+post.Permalink),
+			},
+		}
+	}
+	
 	postsSent.With(prometheus.Labels{
 		"subreddit":  sub.Subreddit,
 		"type":       sub.Type,

@@ -80,7 +80,12 @@ var Commands = []discord.ApplicationCommandCreate{
 					},
 					discord.ApplicationCommandOptionString{
 						Name:        "proxy",
-						Description: "the proxy to use for the post links such as: https://rxddit.com",
+						Description: "the proxy to use for the post links such as: https://rxddit.com or https://vxreddit.com",
+						Required:    false,
+					},
+					discord.ApplicationCommandOptionBool{
+						Name:        "link-button",
+						Description: "whether to include a link button in the post (default: true)",
 						Required:    false,
 					},
 				},
@@ -114,6 +119,11 @@ var Commands = []discord.ApplicationCommandCreate{
 					discord.ApplicationCommandOptionString{
 						Name:        "proxy",
 						Description: "the proxy to use for the post links such as: https://rxddit.com",
+						Required:    false,
+					},
+					discord.ApplicationCommandOptionBool{
+						Name:        "link-button",
+						Description: "whether to include a link button in the post (default: true)",
 						Required:    false,
 					},
 				},
@@ -180,6 +190,10 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	}
 	roleID := data.Snowflake("role")
 	proxy := data.String("proxy")
+	linkButton, ok := data.OptBool("link-button")
+	if !ok {
+		linkButton = true
+	}
 
 	ok, err := b.db.HasSubscriptionByGuildSubreddit(*event.GuildID(), subreddit)
 	if err != nil {
@@ -215,6 +229,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 			FormatType:  FormatType(formatType),
 			RoleID:      roleID,
 			RedditProxy: proxy,
+			LinkButton:  linkButton,
 			Interaction: event.ApplicationCommandInteraction,
 		}
 		_ = event.CreateMessage(discord.MessageCreate{
@@ -251,7 +266,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		return
 	}
 
-	if err = b.db.AddSubscription(Subscription{
+	if err = b.AddSubscription(Subscription{
 		Subreddit:    subreddit,
 		Type:         postType,
 		FormatType:   FormatType(formatType),
@@ -259,6 +274,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		ChannelID:    event.Channel().ID(),
 		WebhookID:    webhook.ID(),
 		WebhookToken: webhook.Token,
+		LinkButton:   linkButton,
 	}); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Failed to save subscription to the database: " + err.Error(),
@@ -278,6 +294,7 @@ func (b *Bot) OnSubredditUpdate(data discord.SlashCommandInteractionData, event 
 	formatType := FormatType(data.String("format-type"))
 	roleID := data.Snowflake("role")
 	proxy := data.String("proxy")
+	linkButton, linkButtonOk := data.OptBool("link-button")
 
 	sub, err := b.db.GetSubscriptionsByGuildSubreddit(*event.GuildID(), subreddit)
 	if errors.Is(err, ErrSubscriptionNotFound) {
@@ -307,8 +324,11 @@ func (b *Bot) OnSubredditUpdate(data discord.SlashCommandInteractionData, event 
 	if proxy == "" {
 		proxy = sub.RedditProxy
 	}
+	if !linkButtonOk {
+		linkButton = sub.LinkButton
+	}
 
-	if err = b.db.UpdateSubscription(sub.WebhookID, postType, formatType, roleID, proxy); err != nil {
+	if err = b.db.UpdateSubscription(sub.WebhookID, postType, formatType, roleID, proxy, linkButton); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Failed to update subscription: " + err.Error(),
 			Flags:   discord.MessageFlagEphemeral,
@@ -428,7 +448,7 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 	webhookID := snowflake.MustParse(wh["id"].(string))
 	webhookToken := wh["token"].(string)
 
-	if err = b.db.AddSubscription(Subscription{
+	if err = b.AddSubscription(Subscription{
 		Subreddit:    setupState.Subreddit,
 		Type:         setupState.PostType,
 		FormatType:   setupState.FormatType,
@@ -438,6 +458,7 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 		WebhookToken: webhookToken,
 		RoleID:       setupState.RoleID,
 		RedditProxy:  setupState.RedditProxy,
+		LinkButton:   setupState.LinkButton,
 	}); err != nil {
 		_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 			Content:    json.Ptr("Failed to save subscription to the database: " + err.Error()),

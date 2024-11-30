@@ -10,5 +10,6 @@ CREATE TABLE IF NOT EXISTS subscriptions
 	last_post     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	role_id       BIGINT    NOT NULL DEFAULT 0,
 	reddit_proxy  VARCHAR   NOT NULL DEFAULT '',
+	link_button   BOOLEAN   NOT NULL DEFAULT TRUE,
 	PRIMARY KEY (subreddit, guild_id)
 )
