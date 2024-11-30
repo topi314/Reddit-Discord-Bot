@@ -170,6 +170,11 @@ func (b *Bot) checkSubscription(sub Subscription) {
 }
 
 func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
+	proxy := defaultRedditProxy
+	if sub.RedditProxy != "" {
+		proxy = sub.RedditProxy
+	}
+
 	var webhookMessageCreate discord.WebhookMessageCreate
 	switch sub.FormatType {
 	case FormatTypeEmbed:
@@ -198,20 +203,16 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 			Embeds: []discord.Embed{embed},
 		}
 	case FormatTypeText:
-		proxy := defaultRedditProxy
-		if sub.RedditProxy != "" {
-			proxy = sub.RedditProxy
-		}
 		webhookMessageCreate = discord.WebhookMessageCreate{
 			Content: fmt.Sprintf("## [%s](%s%s)\n%s", post.Title, proxy, post.Permalink, cutString(quoteString(html.UnescapeString(post.Selftext)), 4000)),
 		}
 	case FormatTypeLink:
-		proxy := defaultRedditProxy
-		if sub.RedditProxy != "" {
-			proxy = sub.RedditProxy
-		}
 		webhookMessageCreate = discord.WebhookMessageCreate{
 			Content: fmt.Sprintf("New [post](%s%s) in [`%s`](<%s>)", proxy, post.Permalink, post.SubredditNamePrefixed, "https://reddit.com/"+post.SubredditNamePrefixed),
+		}
+	case FormatTypeLinkWithTitle:
+		webhookMessageCreate = discord.WebhookMessageCreate{
+			Content: fmt.Sprintf("[%s](%s%s)", post.Title, proxy, post.Permalink),
 		}
 	}
 
@@ -243,7 +244,7 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 			},
 		}
 	}
-	
+
 	postsSent.With(prometheus.Labels{
 		"subreddit":  sub.Subreddit,
 		"type":       sub.Type,

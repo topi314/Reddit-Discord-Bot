@@ -15,13 +15,28 @@ var (
 	ErrSubscriptionNotFound = errors.New("subscription not found")
 )
 
+const (
+	FormatTypeEmbed         FormatType = "embed"
+	FormatTypeText          FormatType = "text"
+	FormatTypeLink          FormatType = "link"
+	FormatTypeLinkWithTitle FormatType = "link_with_title"
+)
+
 type FormatType string
 
-const (
-	FormatTypeEmbed FormatType = "embed"
-	FormatTypeText  FormatType = "text"
-	FormatTypeLink  FormatType = "link"
-)
+func (f FormatType) String() string {
+	switch f {
+	case FormatTypeEmbed:
+		return "Embed"
+	case FormatTypeText:
+		return "Text"
+	case FormatTypeLink:
+		return "Link"
+	case FormatTypeLinkWithTitle:
+		return "Link with Title"
+	}
+	return "Unknown"
+}
 
 type Subscription struct {
 	Subreddit    string       `db:"subreddit"`
