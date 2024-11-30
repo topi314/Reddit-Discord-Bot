@@ -257,7 +257,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	}
 
 	if _, err = b.Client.Rest().CreateWebhookMessage(webhook.ID(), webhook.Token, discord.WebhookMessageCreate{
-		Content: fmt.Sprintf("Added subscription for %s", formatSubreddit(subreddit)),
+		Content: fmt.Sprintf("Added subscription for %s", formatSubreddit(subreddit, false)),
 	}, true, 0); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Failed to send test message to webhook: " + err.Error(),
@@ -284,7 +284,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{
-		Content: fmt.Sprintf("Subscribed to %s)", formatSubreddit(subreddit)),
+		Content: fmt.Sprintf("Subscribed to %s)", formatSubreddit(subreddit, false)),
 	})
 }
 
@@ -337,7 +337,7 @@ func (b *Bot) OnSubredditUpdate(data discord.SlashCommandInteractionData, event 
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{
-		Content: fmt.Sprintf("Updated subscription for %s", formatSubreddit(subreddit)),
+		Content: fmt.Sprintf("Updated subscription for %s", formatSubreddit(subreddit, false)),
 		Flags:   discord.MessageFlagEphemeral,
 	})
 }
@@ -396,7 +396,11 @@ func (b *Bot) OnSubredditList(data discord.SlashCommandInteractionData, event *e
 		if sub.RedditProxy != "" {
 			proxy = fmt.Sprintf("`%s`", sub.RedditProxy)
 		}
-		content += fmt.Sprintf("- `%s` - `%s` - %s - %s- %s\n", strings.Title(sub.Type), strings.Title(string(sub.FormatType)), role, proxy, formatSubreddit(sub.Subreddit))
+		linkButton := "enabled"
+		if !sub.LinkButton {
+			linkButton = "disabled"
+		}
+		content += fmt.Sprintf("- %s - type: `%s` - format: `%s` - role: %s - proxy: %s - link-button: `%s`\n", formatSubreddit(sub.Subreddit, true), strings.Title(sub.Type), strings.Title(string(sub.FormatType)), role, proxy, linkButton)
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{
@@ -469,7 +473,7 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err = b.Client.Rest().CreateWebhookMessage(webhookID, webhookToken, discord.WebhookMessageCreate{
-		Content: fmt.Sprintf("Added subscription for %s", formatSubreddit(setupState.Subreddit)),
+		Content: fmt.Sprintf("Added subscription for %s", formatSubreddit(setupState.Subreddit, false)),
 	}, true, 0); err != nil {
 		_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 			Content:    json.Ptr("Failed to send test message to webhook: " + err.Error()),
@@ -480,12 +484,15 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 
 	delete(b.states, state)
 	_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
-		Content:    json.Ptr(fmt.Sprintf("Subscribed to %s)", formatSubreddit(setupState.Subreddit))),
+		Content:    json.Ptr(fmt.Sprintf("Subscribed to %s)", formatSubreddit(setupState.Subreddit, false))),
 		Components: &[]discord.ContainerComponent{},
 	})
 	_, _ = w.Write([]byte("success, you can close this window now"))
 }
 
-func formatSubreddit(subreddit string) string {
+func formatSubreddit(subreddit string, suppressEmbed bool) string {
+	if suppressEmbed {
+		return fmt.Sprintf("[`r/%s`](<https://reddit.com/r/%s>)", subreddit, subreddit)
+	}
 	return fmt.Sprintf("[`r/%s`](https://reddit.com/r/%s)", subreddit, subreddit)
 }
