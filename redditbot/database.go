@@ -24,7 +24,7 @@ const (
 
 type FormatType string
 
-func (f FormatType) String() string {
+func (f FormatType) Name() string {
 	switch f {
 	case FormatTypeEmbed:
 		return "Embed"

@@ -34,19 +34,19 @@ var typeChoices = []discord.ApplicationCommandOptionChoiceString{
 
 var formatTypeChoices = []discord.ApplicationCommandOptionChoiceString{
 	{
-		Name:  FormatTypeEmbed.String(),
+		Name:  FormatTypeEmbed.Name(),
 		Value: string(FormatTypeEmbed),
 	},
 	{
-		Name:  FormatTypeText.String(),
+		Name:  FormatTypeText.Name(),
 		Value: string(FormatTypeText),
 	},
 	{
-		Name:  FormatTypeLink.String(),
+		Name:  FormatTypeLink.Name(),
 		Value: string(FormatTypeLink),
 	},
 	{
-		Name:  FormatTypeLinkWithTitle.String(),
+		Name:  FormatTypeLinkWithTitle.Name(),
 		Value: string(FormatTypeLinkWithTitle),
 	},
 }
@@ -404,7 +404,7 @@ func (b *Bot) OnSubredditList(data discord.SlashCommandInteractionData, event *e
 		if !sub.LinkButton {
 			linkButton = "disabled"
 		}
-		content += fmt.Sprintf("- %s - type: `%s` - format: `%s` - role: %s - proxy: %s - link-button: `%s`\n", formatSubreddit(sub.Subreddit, true), strings.Title(sub.Type), sub.FormatType.String(), role, proxy, linkButton)
+		content += fmt.Sprintf("- %s - type: `%s` - format: `%s` - role: %s - proxy: %s - link-button: `%s`\n", formatSubreddit(sub.Subreddit, true), strings.Title(sub.Type), sub.FormatType.Name(), role, proxy, linkButton)
 	}
 
 	_ = event.CreateMessage(discord.MessageCreate{
