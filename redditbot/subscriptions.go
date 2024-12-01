@@ -214,6 +214,9 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 		webhookMessageCreate = discord.WebhookMessageCreate{
 			Content: fmt.Sprintf("[%s](%s%s)", post.Title, proxy, post.Permalink),
 		}
+	default:
+		slog.Error("unknown format type", slog.String("format_type", string(sub.FormatType)))
+		return true
 	}
 
 	if sub.RoleID != 0 {
