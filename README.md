@@ -115,7 +115,7 @@ Docker-Compose is the easiest way to run the bot and is also the way I recommend
 
 Create a `docker-compose.yml` file and paste the following into it
 
-```bash
+```yaml
 version: "3.8"
 
 services:
