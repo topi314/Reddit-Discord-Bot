@@ -204,7 +204,7 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 		}
 	case FormatTypeText:
 		webhookMessageCreate = discord.WebhookMessageCreate{
-			Content: fmt.Sprintf("## [%s](%s%s)\n%s", post.Title, proxy, post.Permalink, cutString(quoteString(html.UnescapeString(post.Selftext)), 4000)),
+			Content: fmt.Sprintf("## [%s](%s%s)\n%s", post.Title, proxy, post.Permalink, cutString(quoteString(html.UnescapeString(post.Selftext)), 2000)),
 		}
 	case FormatTypeLink:
 		webhookMessageCreate = discord.WebhookMessageCreate{
