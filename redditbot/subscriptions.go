@@ -16,6 +16,8 @@ import (
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 const (
@@ -29,6 +31,8 @@ var (
 )
 
 var imageRegex = regexp.MustCompile(`https://.*\.(?:jpg|jpeg|gif|png)`)
+
+var errUnknownFormatType = errors.New("unknown format type")
 
 func (b *Bot) AddSubscription(sub Subscription) error {
 	if err := b.db.AddSubscription(sub); err != nil {
@@ -170,82 +174,10 @@ func (b *Bot) checkSubscription(sub Subscription) {
 }
 
 func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
-	proxy := defaultRedditProxy
-	if sub.RedditProxy != "" {
-		proxy = sub.RedditProxy
-	}
-
-	var webhookMessageCreate discord.WebhookMessageCreate
-	switch sub.FormatType {
-	case FormatTypeEmbed:
-		embed := discord.Embed{
-			Title:       cutString(post.Title, 256),
-			Description: cutString(html.UnescapeString(post.Selftext), 4069),
-			URL:         "https://reddit.com" + post.Permalink,
-			Timestamp:   json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
-			Color:       redditColor,
-			Author: &discord.EmbedAuthor{
-				Name:    fmt.Sprintf("%s post in %s", strings.Title(sub.Type), post.SubredditNamePrefixed),
-				URL:     "https://reddit.com/" + post.SubredditNamePrefixed,
-				IconURL: post.SrDetail.CommunityIcon,
-			},
-			Footer: &discord.EmbedFooter{
-				Text: "posted by " + post.Author,
-			},
-		}
-		if imageRegex.MatchString(post.URL) {
-			embed.Image = &discord.EmbedResource{
-				URL: post.URL,
-			}
-		}
-
-		webhookMessageCreate = discord.WebhookMessageCreate{
-			Embeds: []discord.Embed{embed},
-		}
-	case FormatTypeText:
-		webhookMessageCreate = discord.WebhookMessageCreate{
-			Content: fmt.Sprintf("## [%s](%s%s)\n%s", post.Title, proxy, post.Permalink, cutString(quoteString(html.UnescapeString(post.Selftext)), 2000)),
-		}
-	case FormatTypeLink:
-		webhookMessageCreate = discord.WebhookMessageCreate{
-			Content: fmt.Sprintf("New [post](%s%s) in [`%s`](<%s>)", proxy, post.Permalink, post.SubredditNamePrefixed, "https://reddit.com/"+post.SubredditNamePrefixed),
-		}
-	case FormatTypeLinkWithTitle:
-		webhookMessageCreate = discord.WebhookMessageCreate{
-			Content: fmt.Sprintf("[%s](%s%s)", post.Title, proxy, post.Permalink),
-		}
-	default:
+	webhookMessageCreate, err := b.buildPostMessageCreate(sub, post)
+	if err != nil {
 		slog.Error("unknown format type", slog.String("format_type", string(sub.FormatType)))
 		return true
-	}
-
-	if sub.RoleID != 0 {
-		var (
-			mentionContent  string
-			allowedMentions discord.AllowedMentions
-		)
-		if sub.RoleID == sub.GuildID {
-			mentionContent = "@everyone"
-			allowedMentions = discord.AllowedMentions{
-				Parse: []discord.AllowedMentionType{discord.AllowedMentionTypeEveryone},
-			}
-		} else {
-			mentionContent = discord.RoleMention(sub.RoleID)
-			allowedMentions = discord.AllowedMentions{
-				Roles: []snowflake.ID{sub.RoleID},
-			}
-		}
-
-		webhookMessageCreate.Content = mentionContent + "\n" + webhookMessageCreate.Content
-		webhookMessageCreate.AllowedMentions = &allowedMentions
-	}
-
-	if sub.LinkButton {
-		webhookMessageCreate.Components = []discord.LayoutComponent{
-			discord.NewActionRow(
-				discord.NewLinkButton("Open Post", "https://reddit.com"+post.Permalink),
-			),
-		}
 	}
 
 	postsSent.With(prometheus.Labels{
@@ -261,7 +193,7 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 		return true
 	}
 
-	if _, err := b.Client.Rest.CreateWebhookMessage(sub.WebhookID, sub.WebhookToken, webhookMessageCreate, rest.CreateWebhookMessageParams{}); err != nil {
+	if _, err = b.Client.Rest.CreateWebhookMessage(sub.WebhookID, sub.WebhookToken, webhookMessageCreate, rest.CreateWebhookMessageParams{}); err != nil {
 		if restError, ok := errors.AsType[*rest.Error](err); ok && restError.Response.StatusCode == http.StatusNotFound {
 			if err = b.RemoveSubscription(sub.WebhookID, sub.WebhookToken, nil); err != nil {
 				slog.Error("error removing sub for webhook", slog.String("webhook_id", sub.WebhookID.String()), slog.Any("err", err))
@@ -272,6 +204,128 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 	}
 
 	return true
+}
+
+func (b *Bot) buildPostMessageCreate(sub Subscription, post RedditPost) (discord.WebhookMessageCreate, error) {
+	proxy := defaultRedditProxy
+	if sub.RedditProxy != "" {
+		proxy = sub.RedditProxy
+	}
+
+	var (
+		webhookMessageCreate discord.WebhookMessageCreate
+		mentionContent       string
+	)
+	if sub.RoleID != 0 {
+		var allowedMentions discord.AllowedMentions
+		if sub.RoleID == sub.GuildID {
+			mentionContent = "@everyone"
+			allowedMentions = discord.AllowedMentions{
+				Parse: []discord.AllowedMentionType{discord.AllowedMentionTypeEveryone},
+			}
+		} else {
+			mentionContent = discord.RoleMention(sub.RoleID)
+			allowedMentions = discord.AllowedMentions{
+				Roles: []snowflake.ID{sub.RoleID},
+			}
+		}
+		webhookMessageCreate.AllowedMentions = &allowedMentions
+	}
+
+	switch sub.FormatType {
+	case FormatTypeEmbed:
+		embed := discord.Embed{
+			Title:       cutString(post.Title, 256),
+			Description: cutString(html.UnescapeString(post.Selftext), 4069),
+			URL:         "https://reddit.com" + post.Permalink,
+			Timestamp:   json.Ptr(time.Unix(int64(post.CreatedUtc), 0)),
+			Color:       redditColor,
+			Author: &discord.EmbedAuthor{
+				Name:    fmt.Sprintf("%s post in %s", cases.Title(language.Und).String(sub.Type), post.SubredditNamePrefixed),
+				URL:     "https://reddit.com/" + post.SubredditNamePrefixed,
+				IconURL: post.SrDetail.CommunityIcon,
+			},
+			Footer: &discord.EmbedFooter{
+				Text: "posted by " + post.Author,
+			},
+		}
+		if imageRegex.MatchString(post.URL) {
+			embed.Image = &discord.EmbedResource{
+				URL: post.URL,
+			}
+		}
+
+		webhookMessageCreate.Embeds = []discord.Embed{embed}
+	case FormatTypeText:
+		webhookMessageCreate.Content = fmt.Sprintf("## [%s](%s%s)\n%s", post.Title, proxy, post.Permalink, cutString(quoteString(html.UnescapeString(post.Selftext)), 2000))
+	case FormatTypeLink:
+		webhookMessageCreate.Content = fmt.Sprintf("New [post](%s%s) in [`%s`](<%s>)", proxy, post.Permalink, post.SubredditNamePrefixed, "https://reddit.com/"+post.SubredditNamePrefixed)
+	case FormatTypeLinkWithTitle:
+		webhookMessageCreate.Content = fmt.Sprintf("[%s](%s%s)", post.Title, proxy, post.Permalink)
+	case FormatTypeComponents:
+		postURL := proxy + post.Permalink
+		subredditURL := "https://reddit.com/" + post.SubredditNamePrefixed
+		authorURL := "https://reddit.com/user/" + post.Author
+
+		icon := post.SrDetail.CommunityIcon
+		if icon == "" {
+			icon = "https://raw.githubusercontent.com/topi314/Reddit-Discord-Bot/refs/heads/v2/reddit.png"
+		}
+
+		var containerComponents []discord.ContainerSubComponent
+		if mentionContent != "" {
+			containerComponents = append(containerComponents, discord.NewTextDisplay(mentionContent))
+		}
+
+		containerComponents = append(containerComponents, discord.NewSection(
+			discord.NewTextDisplay(fmt.Sprintf("%s post in [%s](%s)", cases.Title(language.Und).String(sub.Type), post.SubredditNamePrefixed, subredditURL)),
+			discord.NewTextDisplay(fmt.Sprintf("### [%s](%s)", cutString(post.Title, 256), postURL)),
+		).WithAccessory(discord.NewThumbnail(icon)))
+
+		if body := cutString(html.UnescapeString(post.Selftext), 2000); body != "" {
+			containerComponents = append(containerComponents, discord.NewTextDisplay(body))
+		}
+
+		if imageRegex.MatchString(post.URL) {
+			containerComponents = append(containerComponents, discord.NewMediaGallery(discord.MediaGalleryItem{
+				Media: discord.UnfurledMediaItem{URL: post.URL},
+			}))
+		}
+
+		containerComponents = append(containerComponents,
+			discord.NewSmallSeparator(),
+			discord.NewTextDisplay(fmt.Sprintf("-# posted by [%s](%s) on %s", post.Author, authorURL, time.Unix(int64(post.CreatedUtc), 0).Format("Jan 2 2006 at 15:04:05"))),
+		)
+
+		if sub.LinkButton {
+			containerComponents = append(containerComponents,
+				discord.NewActionRow(discord.NewLinkButton("Open Post", postURL)),
+			)
+		}
+
+		webhookMessageCreate.Components = []discord.LayoutComponent{
+			discord.NewContainer(containerComponents...).WithAccentColor(redditColor),
+		}
+		webhookMessageCreate.Flags = discord.MessageFlagIsComponentsV2
+	default:
+		return discord.WebhookMessageCreate{}, fmt.Errorf("%w: %s", errUnknownFormatType, sub.FormatType)
+	}
+
+	if sub.FormatType != FormatTypeComponents {
+		if mentionContent != "" {
+			webhookMessageCreate.Content = cutString(mentionContent+"\n"+webhookMessageCreate.Content, 2000)
+		}
+
+		if sub.LinkButton {
+			webhookMessageCreate.Components = []discord.LayoutComponent{
+				discord.NewActionRow(
+					discord.NewLinkButton("Open Post", "https://reddit.com"+post.Permalink),
+				),
+			}
+		}
+	}
+
+	return webhookMessageCreate, nil
 }
 
 func cutString(str string, maxLen int) string {

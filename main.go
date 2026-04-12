@@ -28,8 +28,6 @@ var (
 )
 
 func main() {
-	version, commit := readVersionAndCommit()
-	slog.Info("starting reddit-discord-bot...", slog.String("version", version), slog.String("commit", commit))
 	cfg, err := redditbot.ReadConfig()
 	if err != nil {
 		slog.Error("error reading config", slog.Any("err", err))
@@ -40,6 +38,9 @@ func main() {
 		slog.Error("error setting up logger", slog.Any("err", err))
 		return
 	}
+
+	version, commit := readVersionAndCommit()
+	slog.Info("starting reddit-discord-bot...", slog.String("version", version), slog.String("commit", commit))
 
 	slog.Info("loaded config", slog.String("config", cfg.String()))
 	if err = cfg.Validate(); err != nil {

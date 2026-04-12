@@ -12,6 +12,7 @@ The bot does not require any permissions and can't do anything in your Discord. 
 
 - [Public Bot](#public-bot)
 - [Usage](#usage)
+    - [Test Subreddit](#test-subreddit)
 	- [Add Subreddit](#add-subreddit)
 	- [Remove Subreddit](#remove-subreddit)
 	- [List Subreddits](#list-subreddits)
@@ -31,12 +32,20 @@ Invite the bot [here](https://discord.com/oauth2/authorize?client_id=84639624924
 
 ## Usage
 
+### Test Subreddit
+
+To test a subreddit and format type run
+
+```bash
+/reddit test <subreddit-name> (new) (components/embed/text/link/link_with_title) (role) (proxy)
+```
+
 ### Add Subreddit
 
 To add a new subreddit run
 
 ```bash
-/reddit add <subreddit-name> (new/hot/top/rising) (embed/text/link) (role) (proxy)
+/reddit add <subreddit-name> (new) (components/embed/text/link/link_with_title) (role) (proxy)
 ```
 
 and click the returned link
@@ -48,7 +57,7 @@ select the server & channel in the discord popup & hit okay that's all!
 To update a subreddit run
 
 ```bash
-/reddit update <subreddit-name> (new/hot/top/rising) (embed/text/link) (role) (proxy)
+/reddit update <subreddit-name> (new) (components/embed/text/link/link_with_title) (role) (proxy)
 ```
 
 ### Remove Subreddit

@@ -3,6 +3,7 @@ package redditbot
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -35,6 +36,10 @@ var typeChoices = []discord.ApplicationCommandOptionChoiceString{
 }
 
 var formatTypeChoices = []discord.ApplicationCommandOptionChoiceString{
+	{
+		Name:  FormatTypeComponents.Name(),
+		Value: string(FormatTypeComponents),
+	},
 	{
 		Name:  FormatTypeEmbed.Name(),
 		Value: string(FormatTypeEmbed),
@@ -146,6 +151,44 @@ var Commands = []discord.ApplicationCommandCreate{
 				},
 			},
 			discord.ApplicationCommandOptionSubCommand{
+				Name:        "test",
+				Description: "send a test post for a subscribed subreddit immediately",
+				Options: []discord.ApplicationCommandOption{
+					discord.ApplicationCommandOptionString{
+						Name:        "subreddit",
+						Description: "the subreddit to test, or a post path/link like r/gaming/comments/1sjd8hb",
+						Required:    true,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "type",
+						Description: "the type of posts to send",
+						Required:    false,
+						Choices:     typeChoices,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "format-type",
+						Description: "how to format the subreddit posts",
+						Required:    false,
+						Choices:     formatTypeChoices,
+					},
+					discord.ApplicationCommandOptionRole{
+						Name:        "role",
+						Description: "the role to ping when a post is sent",
+						Required:    false,
+					},
+					discord.ApplicationCommandOptionString{
+						Name:        "proxy",
+						Description: "the proxy to use for the post links such as: https://rxddit.com or https://vxreddit.com",
+						Required:    false,
+					},
+					discord.ApplicationCommandOptionBool{
+						Name:        "link-button",
+						Description: "whether to include a link button in the post (default: true)",
+						Required:    false,
+					},
+				},
+			},
+			discord.ApplicationCommandOptionSubCommand{
 				Name:        "list",
 				Description: "list your subscribed subreddits",
 				Options: []discord.ApplicationCommandOption{
@@ -176,6 +219,8 @@ func (b *Bot) OnApplicationCommand(event *events.ApplicationCommandInteractionCr
 			b.OnSubredditUpdate(data, event)
 		case "remove":
 			b.OnSubredditRemove(data, event)
+		case "test":
+			b.OnSubredditTest(data, event)
 		case "list":
 			b.OnSubredditList(data, event)
 		}
@@ -192,7 +237,7 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 	}
 	formatType, ok := data.OptString("format-type")
 	if !ok {
-		formatType = "embed"
+		formatType = "components"
 	}
 	roleID := data.Snowflake("role")
 	proxy := data.String("proxy")
@@ -365,6 +410,88 @@ func (b *Bot) OnSubredditRemove(data discord.SlashCommandInteractionData, event 
 		Content: fmt.Sprintf("Removed subreddit %s", subreddit),
 		Flags:   discord.MessageFlagEphemeral,
 	})
+}
+
+func (b *Bot) OnSubredditTest(data discord.SlashCommandInteractionData, event *events.ApplicationCommandInteractionCreate) {
+	target := data.String("subreddit")
+	subreddit, postID, err := ParseSubredditOrPostTarget(target)
+	if err != nil {
+		_ = event.CreateMessage(discord.MessageCreate{
+			Content: "Invalid subreddit target: " + err.Error(),
+			Flags:   discord.MessageFlagEphemeral,
+		})
+		return
+	}
+
+	// /reddit test intentionally ignores saved subscriptions.
+	// It always starts with add-like defaults and applies explicit overrides.
+	sub := &Subscription{
+		Subreddit:  subreddit,
+		Type:       "new",
+		FormatType: FormatTypeEmbed,
+		GuildID:    *event.GuildID(),
+		LinkButton: true,
+	}
+
+	if postType, ok := data.OptString("type"); ok {
+		sub.Type = postType
+	}
+	if formatType, ok := data.OptString("format-type"); ok {
+		sub.FormatType = FormatType(formatType)
+	}
+	if roleID := data.Snowflake("role"); roleID != 0 {
+		sub.RoleID = roleID
+	}
+	if proxy, ok := data.OptString("proxy"); ok {
+		sub.RedditProxy = proxy
+	}
+	if linkButton, ok := data.OptBool("link-button"); ok {
+		sub.LinkButton = linkButton
+	}
+
+	var post *RedditPost
+	if postID != "" {
+		post, err = b.reddit.GetPostByID(postID)
+	} else {
+		post, err = b.reddit.GetLatestPost(sub.Subreddit, sub.Type)
+	}
+	if err != nil {
+		_ = event.CreateMessage(discord.MessageCreate{
+			Content: "Failed to fetch latest post from Reddit: " + err.Error(),
+			Flags:   discord.MessageFlagEphemeral,
+		})
+		return
+	}
+	if post == nil {
+		message := fmt.Sprintf("No recent posts found for %s", formatSubreddit(sub.Subreddit, true))
+		if postID != "" {
+			message = fmt.Sprintf("Post not found: `%s`", postID)
+		}
+		_ = event.CreateMessage(discord.MessageCreate{
+			Content: message,
+			Flags:   discord.MessageFlagEphemeral,
+		})
+		return
+	}
+
+	preview, err := b.buildPostMessageCreate(*sub, *post)
+	if err != nil {
+		_ = event.CreateMessage(discord.MessageCreate{
+			Content: "Failed to format test post: " + err.Error(),
+			Flags:   discord.MessageFlagEphemeral,
+		})
+		return
+	}
+
+	if err = event.CreateMessage(discord.MessageCreate{
+		Content:         preview.Content,
+		Embeds:          preview.Embeds,
+		Components:      preview.Components,
+		AllowedMentions: preview.AllowedMentions,
+		Flags:           preview.Flags,
+	}); err != nil {
+		slog.Error("Failed to send test message", slog.Any("err", err))
+	}
 }
 
 func (b *Bot) OnSubredditList(data discord.SlashCommandInteractionData, event *events.ApplicationCommandInteractionCreate) {

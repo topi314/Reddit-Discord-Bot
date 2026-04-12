@@ -59,7 +59,6 @@ func ReadConfig() (Config, error) {
 	}
 
 	k := koanf.New(".")
-	slog.Info("Loading config", slog.String("path", *path))
 	if err := k.Load(file.Provider(*path), yaml.Parser()); err != nil {
 		return Config{}, err
 	}

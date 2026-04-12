@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -168,13 +170,94 @@ func (r *Reddit) GetPostsUntil(subreddit string, fetchType string, until time.Ti
 	}
 }
 
-func (r *Reddit) getPosts(subreddit string, fetchType string, after string) ([]RedditPost, error) {
-	url := fmt.Sprintf("https://oauth.reddit.com/r/%s/%s.json?raw_json=1&sr_detail=true&limit=100", subreddit, fetchType)
-	if after != "" {
-		url += fmt.Sprintf("&after=%s", after)
+func (r *Reddit) GetLatestPost(subreddit string, fetchType string) (*RedditPost, error) {
+	posts, err := r.getPosts(subreddit, fetchType, "")
+	if err != nil {
+		return nil, err
 	}
-	slog.Debug("getting posts for", slog.String("url", url))
-	rq, err := http.NewRequest(http.MethodGet, url, nil)
+	if len(posts) == 0 {
+		return nil, nil
+	}
+
+	return &posts[0], nil
+}
+
+func (r *Reddit) GetPostByID(postID string) (*RedditPost, error) {
+	link := fmt.Sprintf("https://oauth.reddit.com/api/info.json?raw_json=1&sr_detail=true&id=t3_%s", postID)
+	rq, err := http.NewRequest(http.MethodGet, link, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	rs, err := r.do(rq, false)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rs.Body.Close()
+	}()
+
+	if rs.StatusCode == http.StatusNotFound {
+		return nil, ErrSubredditNotFound
+	} else if rs.StatusCode == http.StatusForbidden {
+		return nil, ErrSubredditForbidden
+	}
+
+	var response RedditResponse[RedditListing[RedditPost]]
+	if err = json.NewDecoder(rs.Body).Decode(&response); err != nil {
+		return nil, err
+	}
+	if len(response.Data.Children) == 0 {
+		return nil, nil
+	}
+
+	post := response.Data.Children[0].Data
+	return &post, nil
+}
+
+func ParseSubredditOrPostTarget(input string) (subreddit string, postID string, err error) {
+	raw := strings.TrimSpace(input)
+	if raw == "" {
+		return "", "", fmt.Errorf("target cannot be empty")
+	}
+
+	if strings.Contains(raw, "://") {
+		u, parseErr := url.Parse(raw)
+		if parseErr != nil {
+			return "", "", fmt.Errorf("invalid target url: %w", parseErr)
+		}
+		raw = u.Path
+	}
+
+	raw = strings.SplitN(raw, "?", 2)[0]
+	raw = strings.SplitN(raw, "#", 2)[0]
+	raw = strings.Trim(raw, "/")
+	raw = strings.TrimPrefix(raw, "r/")
+
+	parts := strings.Split(raw, "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", "", fmt.Errorf("invalid target")
+	}
+
+	subreddit = parts[0]
+	if len(parts) == 1 {
+		return subreddit, "", nil
+	}
+
+	if len(parts) >= 3 && parts[1] == "comments" && parts[2] != "" {
+		return subreddit, parts[2], nil
+	}
+
+	return "", "", fmt.Errorf("invalid target, expected subreddit or subreddit/comments/post_id")
+}
+
+func (r *Reddit) getPosts(subreddit string, fetchType string, after string) ([]RedditPost, error) {
+	link := fmt.Sprintf("https://oauth.reddit.com/r/%s/%s.json?raw_json=1&sr_detail=true&limit=100", subreddit, fetchType)
+	if after != "" {
+		link += fmt.Sprintf("&after=%s", after)
+	}
+	slog.Debug("getting posts for", slog.String("url", link))
+	rq, err := http.NewRequest(http.MethodGet, link, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -207,8 +290,8 @@ func (r *Reddit) getPosts(subreddit string, fetchType string, after string) ([]R
 }
 
 func (r *Reddit) CheckSubreddit(subreddit string) error {
-	url := fmt.Sprintf("https://oauth.reddit.com/r/%s/about.json?raw_json=1", subreddit)
-	rq, err := http.NewRequest(http.MethodGet, url, nil)
+	link := fmt.Sprintf("https://oauth.reddit.com/r/%s/about.json?raw_json=1", subreddit)
+	rq, err := http.NewRequest(http.MethodGet, link, nil)
 	if err != nil {
 		return err
 	}

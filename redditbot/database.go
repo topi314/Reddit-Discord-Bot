@@ -16,6 +16,7 @@ var (
 )
 
 const (
+	FormatTypeComponents    FormatType = "components"
 	FormatTypeEmbed         FormatType = "embed"
 	FormatTypeText          FormatType = "text"
 	FormatTypeLink          FormatType = "link"
@@ -26,6 +27,8 @@ type FormatType string
 
 func (f FormatType) Name() string {
 	switch f {
+	case FormatTypeComponents:
+		return "Components"
 	case FormatTypeEmbed:
 		return "Embed"
 	case FormatTypeText:
