@@ -257,7 +257,7 @@ func (b *Bot) buildPostMessageCreate(sub Subscription, post RedditPost) (discord
 
 		webhookMessageCreate.Embeds = []discord.Embed{embed}
 	case FormatTypeText:
-		webhookMessageCreate.Content = fmt.Sprintf("## [%s](%s%s)\n%s", post.Title, proxy, post.Permalink, cutString(quoteString(html.UnescapeString(post.Selftext)), 2000))
+		webhookMessageCreate.Content = cutString(fmt.Sprintf("## [%s](%s%s)\n%s", post.Title, proxy, post.Permalink, quoteString(html.UnescapeString(post.Selftext))), 2000)
 	case FormatTypeLink:
 		webhookMessageCreate.Content = fmt.Sprintf("New [post](%s%s) in [`%s`](<%s>)", proxy, post.Permalink, post.SubredditNamePrefixed, "https://reddit.com/"+post.SubredditNamePrefixed)
 	case FormatTypeLinkWithTitle:
