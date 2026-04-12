@@ -48,7 +48,7 @@ func (b *Bot) AddSubscription(sub Subscription) error {
 
 func (b *Bot) RemoveSubscription(webhookID snowflake.ID, webhookToken string, err error) error {
 	if err != nil {
-		_, _ = b.Client.Rest().CreateWebhookMessage(webhookID, webhookToken, discord.WebhookMessageCreate{
+		_, _ = b.Client.Rest.CreateWebhookMessage(webhookID, webhookToken, discord.WebhookMessageCreate{
 			Embeds: []discord.Embed{
 				{
 					Title:       "Error",
@@ -57,14 +57,14 @@ func (b *Bot) RemoveSubscription(webhookID snowflake.ID, webhookToken string, er
 					Description: fmt.Sprintf("An error occurred while trying to get posts from this subreddit: %s\nRemoving this webhook" + err.Error()),
 				},
 			},
-		}, false, 0)
+		}, rest.CreateWebhookMessageParams{})
 	}
 
 	errMessage := "unknown error"
 	if err != nil {
 		errMessage = err.Error()
 	}
-	_ = b.Client.Rest().DeleteWebhookWithToken(webhookID, webhookToken, rest.WithReason("Removing webhook because of error: "+errMessage))
+	_ = b.Client.Rest.DeleteWebhookWithToken(webhookID, webhookToken, rest.WithReason("Removing webhook because of error: "+errMessage))
 
 	sub, err := b.db.RemoveSubscription(webhookID)
 	if err != nil {
@@ -88,7 +88,7 @@ func (b *Bot) RemoveSubscriptionByGuildSubreddit(guildID snowflake.ID, subreddit
 		return err
 	}
 
-	_ = b.Client.Rest().DeleteWebhookWithToken(sub.WebhookID, sub.WebhookToken, rest.WithReason(reason))
+	_ = b.Client.Rest.DeleteWebhookWithToken(sub.WebhookID, sub.WebhookToken, rest.WithReason(reason))
 
 	subreddits.With(prometheus.Labels{
 		"subreddit":  sub.Subreddit,
@@ -241,10 +241,10 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 	}
 
 	if sub.LinkButton {
-		webhookMessageCreate.Components = []discord.ContainerComponent{
-			discord.ActionRowComponent{
+		webhookMessageCreate.Components = []discord.LayoutComponent{
+			discord.NewActionRow(
 				discord.NewLinkButton("Open Post", "https://reddit.com"+post.Permalink),
-			},
+			),
 		}
 	}
 
@@ -261,9 +261,8 @@ func (b *Bot) sendPost(sub Subscription, post RedditPost) bool {
 		return true
 	}
 
-	if _, err := b.Client.Rest().CreateWebhookMessage(sub.WebhookID, sub.WebhookToken, webhookMessageCreate, false, 0); err != nil {
-		var restError rest.Error
-		if errors.As(err, &restError) && restError.Response.StatusCode == http.StatusNotFound {
+	if _, err := b.Client.Rest.CreateWebhookMessage(sub.WebhookID, sub.WebhookToken, webhookMessageCreate, rest.CreateWebhookMessageParams{}); err != nil {
+		if restError, ok := errors.AsType[*rest.Error](err); ok && restError.Response.StatusCode == http.StatusNotFound {
 			if err = b.RemoveSubscription(sub.WebhookID, sub.WebhookToken, nil); err != nil {
 				slog.Error("error removing sub for webhook", slog.String("webhook_id", sub.WebhookID.String()), slog.Any("err", err))
 			}

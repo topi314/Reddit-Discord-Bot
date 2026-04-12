@@ -77,7 +77,7 @@ Before you can run the bot you need to create a config file. You can find an exa
 
 You also need a discord bot token, which you can get from [here](https://discord.com/developers/applications).
 
-Lastly you need to create a reddit app which can be done [here](https://www.reddit.com/prefs/apps/).
+Lastly you need to create a Reddit app which can be done [here](https://www.reddit.com/prefs/apps/).
 
 The bot requires a database, which can either be `SQLite` or `PostgreSQL`. Just select the one you want to use in the config file.
 
@@ -116,8 +116,6 @@ Docker-Compose is the easiest way to run the bot and is also the way I recommend
 Create a `docker-compose.yml` file and paste the following into it
 
 ```yaml
-version: "3.8"
-
 services:
   reddit-bot:
     image: ghcr.io/topi314/reddit-discord-bot:v2
@@ -141,7 +139,7 @@ Also create a `database.db` file if you want to use SQLite.
 You can now run the bot with
 
 ```bash
-$ docker-compose up -d
+$ docker compose up -d
 ```
 
 #### Updating
@@ -149,8 +147,8 @@ $ docker-compose up -d
 To update the bot just run
 
 ```bash
-$ docker-compose pull
-$ docker-compose up -d
+$ docker compose pull
+$ docker compose up -d
 ```
 
 #### Stopping
@@ -158,12 +156,12 @@ $ docker-compose up -d
 To stop the bot run
 
 ```bash
-$ docker-compose down
+$ docker compose down
 ```
 
 # Help
 
-If you encounter any problems feel free to open an issue or reach out to me(`toπ#3141`) via discord [here](https://discord.gg/RKM92xXu4Y)
+If you encounter any problems feel free to open an issue or reach out to me(`topi314`) via discord [here](https://discord.gg/RKM92xXu4Y)
 
 # License
 
@@ -176,6 +174,6 @@ Contributions are always welcome! Just open a pull request or discussion and I w
 ## Contact
 
 - [Discord](https://discord.gg/sD3ABd5)
-- [Twitter](https://twitter.com/topi314)
-- [Email](mailto:git@topi.wtf)
+- [Twitter](https://twitter.com/topi3141)
+- [Email](mailto:hi@topi.wtf)
 - [Matrix](https://matrix.to/#/@topi:topi.wtf)

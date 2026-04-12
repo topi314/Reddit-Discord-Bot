@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -19,11 +20,6 @@ import (
 )
 
 var (
-	Version = "unknown"
-	Commit  = "unknown"
-)
-
-var (
 	//go:embed sql/schema.sql
 	schema string
 
@@ -32,7 +28,8 @@ var (
 )
 
 func main() {
-	slog.Info("starting reddit-discord-bot...", slog.String("version", Version), slog.String("commit", Commit))
+	version, commit := readVersionAndCommit()
+	slog.Info("starting reddit-discord-bot...", slog.String("version", version), slog.String("commit", commit))
 	cfg, err := redditbot.ReadConfig()
 	if err != nil {
 		slog.Error("error reading config", slog.Any("err", err))
@@ -58,7 +55,7 @@ func main() {
 		return
 	}
 
-	reddit, err := redditbot.NewReddit(cfg.Reddit, Version)
+	reddit, err := redditbot.NewReddit(cfg.Reddit, version)
 	if err != nil {
 		slog.Error("error creating reddit client", slog.Any("err", err))
 		return
@@ -93,7 +90,7 @@ func main() {
 	b.Client.AddEventListeners(bot.NewListenerFunc(b.OnApplicationCommand))
 
 	if cfg.Discord.SyncCommands {
-		if _, err = client.Rest().SetGlobalCommands(client.ApplicationID(), redditbot.Commands); err != nil {
+		if _, err = client.Rest.SetGlobalCommands(client.ApplicationID, redditbot.Commands); err != nil {
 			slog.Error("error setting global commands", slog.Any("err", err))
 		}
 	}
@@ -133,6 +130,29 @@ func main() {
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, syscall.SIGINT, syscall.SIGTERM)
 	<-s
+}
+
+func readVersionAndCommit() (version string, commit string) {
+	version = "(devel)"
+	commit = "unknown"
+
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return version, commit
+	}
+
+	if bi.Main.Version != "" {
+		version = bi.Main.Version
+	}
+
+	for _, s := range bi.Settings {
+		if s.Key == "vcs.revision" && s.Value != "" {
+			commit = s.Value
+			break
+		}
+	}
+
+	return version, commit
 }
 
 func setupLogger(cfg redditbot.LogConfig) error {

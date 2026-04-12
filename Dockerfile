@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 
 WORKDIR /build
 
@@ -10,15 +10,13 @@ COPY . .
 
 ARG TARGETOS
 ARG TARGETARCH
-ARG VERSION
-ARG COMMIT
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
     CGO_ENABLED=0 \
     GOOS=$TARGETOS \
     GOARCH=$TARGETARCH \
-    go build -ldflags="-X 'main.Version=$VERSION' -X 'main.Commit=$COMMIT'" -o reddit-discord-bot github.com/topi314/reddit-discord-bot/v2
+    go build -o reddit-discord-bot github.com/topi314/reddit-discord-bot/v2
 
 FROM alpine
 

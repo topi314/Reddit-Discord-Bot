@@ -8,7 +8,9 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 )
 
@@ -155,7 +157,7 @@ var Commands = []discord.ApplicationCommandCreate{
 				},
 			},
 		},
-		DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionManageGuild),
+		DefaultMemberPermissions: omit.NewPtr(discord.PermissionManageGuild),
 	},
 	discord.SlashCommandCreate{
 		Name:        "info",
@@ -238,17 +240,17 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		}
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: fmt.Sprintf("Click the button to add a webhook for the subreddit `%s`", subreddit),
-			Components: []discord.ContainerComponent{
-				discord.ActionRowComponent{
+			Components: []discord.LayoutComponent{
+				discord.NewActionRow(
 					discord.NewLinkButton("Add Webhook", url),
-				},
+				),
 			},
 			Flags: discord.MessageFlagEphemeral,
 		})
 		return
 	}
 
-	webhook, err := b.Client.Rest().CreateWebhook(event.Channel().ID(), discord.WebhookCreate{
+	webhook, err := b.Client.Rest.CreateWebhook(event.Channel().ID(), discord.WebhookCreate{
 		Name:   subreddit,
 		Avatar: discord.NewIconRaw(discord.IconTypePNG, b.redditIcon),
 	})
@@ -260,9 +262,11 @@ func (b *Bot) OnSubredditAdd(data discord.SlashCommandInteractionData, event *ev
 		return
 	}
 
-	if _, err = b.Client.Rest().CreateWebhookMessage(webhook.ID(), webhook.Token, discord.WebhookMessageCreate{
+	if _, err = b.Client.Rest.CreateWebhookMessage(webhook.ID(), webhook.Token, discord.WebhookMessageCreate{
 		Content: fmt.Sprintf("Added subscription for %s", formatSubreddit(subreddit, false)),
-	}, true, 0); err != nil {
+	}, rest.CreateWebhookMessageParams{
+		Wait: true,
+	}); err != nil {
 		_ = event.CreateMessage(discord.MessageCreate{
 			Content: "Failed to send test message to webhook: " + err.Error(),
 			Flags:   discord.MessageFlagEphemeral,
@@ -434,9 +438,9 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 	defer delete(b.states, state)
 	token, err := b.discordConfig.Exchange(r.Context(), code)
 	if err != nil {
-		_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
+		_, _ = b.Client.Rest.UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 			Content:    json.Ptr("Error while exchanging code: " + err.Error()),
-			Components: &[]discord.ContainerComponent{},
+			Components: &[]discord.LayoutComponent{},
 		})
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -445,9 +449,9 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 	webhookRaw := token.Extra("webhook")
 	if webhookRaw == nil {
 		err = errors.New("no webhook found in token response")
-		_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
+		_, _ = b.Client.Rest.UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 			Content:    json.Ptr("Failed to get webhook: " + err.Error()),
-			Components: &[]discord.ContainerComponent{},
+			Components: &[]discord.LayoutComponent{},
 		})
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -468,28 +472,30 @@ func (b *Bot) OnDiscordCallback(w http.ResponseWriter, r *http.Request) {
 		RedditProxy:  setupState.RedditProxy,
 		LinkButton:   setupState.LinkButton,
 	}); err != nil {
-		_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
+		_, _ = b.Client.Rest.UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 			Content:    json.Ptr("Failed to save subscription to the database: " + err.Error()),
-			Components: &[]discord.ContainerComponent{},
+			Components: &[]discord.LayoutComponent{},
 		})
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if _, err = b.Client.Rest().CreateWebhookMessage(webhookID, webhookToken, discord.WebhookMessageCreate{
+	if _, err = b.Client.Rest.CreateWebhookMessage(webhookID, webhookToken, discord.WebhookMessageCreate{
 		Content: fmt.Sprintf("Added subscription for %s", formatSubreddit(setupState.Subreddit, false)),
-	}, true, 0); err != nil {
-		_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
+	}, rest.CreateWebhookMessageParams{
+		Wait: true,
+	}); err != nil {
+		_, _ = b.Client.Rest.UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 			Content:    json.Ptr("Failed to send test message to webhook: " + err.Error()),
-			Components: &[]discord.ContainerComponent{},
+			Components: &[]discord.LayoutComponent{},
 		})
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	delete(b.states, state)
-	_, _ = b.Client.Rest().UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
+	_, _ = b.Client.Rest.UpdateInteractionResponse(setupState.Interaction.ApplicationID(), setupState.Interaction.Token(), discord.MessageUpdate{
 		Content:    json.Ptr(fmt.Sprintf("Subscribed to %s)", formatSubreddit(setupState.Subreddit, false))),
-		Components: &[]discord.ContainerComponent{},
+		Components: &[]discord.LayoutComponent{},
 	})
 	_, _ = w.Write([]byte("success, you can close this window now"))
 }

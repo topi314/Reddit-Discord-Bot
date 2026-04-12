@@ -49,7 +49,7 @@ type SetupState struct {
 	Interaction discord.ApplicationCommandInteraction
 }
 
-func New(cfg Config, redditIcon []byte, client bot.Client, reddit *Reddit, db *DB) *Bot {
+func New(cfg Config, redditIcon []byte, client *bot.Client, reddit *Reddit, db *DB) *Bot {
 	return &Bot{
 		cfg:        cfg,
 		redditIcon: redditIcon,
@@ -58,7 +58,7 @@ func New(cfg Config, redditIcon []byte, client bot.Client, reddit *Reddit, db *D
 		db:         db,
 		rand:       rand.New(rand.NewSource(time.Now().UnixNano())),
 		discordConfig: &oauth2.Config{
-			ClientID:     client.ApplicationID().String(),
+			ClientID:     client.ApplicationID.String(),
 			ClientSecret: cfg.Discord.ClientSecret,
 			Endpoint: oauth2.Endpoint{
 				AuthURL:   authURL,
@@ -75,7 +75,7 @@ func New(cfg Config, redditIcon []byte, client bot.Client, reddit *Reddit, db *D
 type Bot struct {
 	cfg           Config
 	redditIcon    []byte
-	Client        bot.Client
+	Client        *bot.Client
 	reddit        *Reddit
 	db            *DB
 	Server        *http.Server
